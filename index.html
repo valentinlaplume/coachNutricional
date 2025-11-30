@@ -2,286 +2,713 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Balance Calórico Semanal</title>
-    <!-- Bootstrap 5 CDN -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome para íconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    
     <style>
+        :root {
+            /* Paleta de colores refinada para móvil */
+            --color-primary: #007aff;
+            --color-success: #34c759;
+            --color-danger: #ff3b30;
+            --color-warning: #ff9500;
+            --color-secondary: #8e8e93;
+            --color-background: #f2f2f7;
+            --color-card-bg: #ffffff;
+            --color-text-dark: #1c1c1e;
+            --color-text-light: #ffffff;
+            --color-border: #e5e5ea;
+            
+            /* Sistema de tipografía optimizado para móvil */
+            --font-size-xs: 0.75rem;      /* 12px */
+            --font-size-sm: 0.875rem;     /* 14px */
+            --font-size-base: 1rem;       /* 16px */
+            --font-size-lg: 1.125rem;     /* 18px */
+            --font-size-xl: 1.25rem;      /* 20px */
+            --font-size-2xl: 1.5rem;      /* 24px */
+            --font-size-3xl: 2rem;        /* 32px */
+            --font-size-4xl: 2.5rem;      /* 40px */
+            
+            /* Espaciado consistente */
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body {
-            background-color: #f7f9fc;
-            font-family: 'Inter', sans-serif;
+            background-color: var(--color-background);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-size: var(--font-size-base);
+            color: var(--color-text-dark);
+            padding-bottom: var(--spacing-xl);
+            overflow-x: hidden;
+            line-height: 1.5;
         }
+        
+        /* Contenedor principal con máximo ancho para tablets */
         .container-fluid {
-            max-width: 1200px;
+            padding-left: var(--spacing-md);
+            padding-right: var(--spacing-md);
+            max-width: 640px;
+            margin: 0 auto;
         }
+        
+        /* Sistema de tipografía jerárquico */
+        .h4 { 
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            color: var(--color-text-dark);
+            margin-bottom: var(--spacing-xs);
+            line-height: 1.2;
+        }
+        
+        .h5 { 
+            font-size: var(--font-size-xl);
+            font-weight: 600;
+            color: var(--color-text-dark);
+            margin-bottom: var(--spacing-sm);
+            line-height: 1.3;
+        }
+        
+        .h6 {
+            font-size: var(--font-size-base);
+            font-weight: 600;
+            color: var(--color-text-dark);
+            margin-bottom: var(--spacing-xs);
+            line-height: 1.4;
+        }
+        
+        p {
+            font-size: var(--font-size-base);
+            margin-bottom: var(--spacing-sm);
+        }
+        
+        .text-muted, .small { 
+            font-size: var(--font-size-sm);
+            color: var(--color-secondary);
+        }
+        
+        .text-xs {
+            font-size: var(--font-size-xs);
+        }
+
+        /* Sistema de tarjetas mejorado */
         .card {
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            background-color: var(--color-card-bg);
+            margin-bottom: var(--spacing-md);
         }
+        
+        .card-header-custom {
+            border-bottom: 1px solid var(--color-border);
+            padding: var(--spacing-md);
+            background-color: transparent;
+        }
+        
+        /* Cajas de resumen optimizadas para táctil */
         .summary-box {
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            border-radius: 0.75rem;
-            padding: 1rem;
-        }
-        .summary-box:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-        }
-        .balance-neto-box {
-            /* Estilo por defecto */
-            background: linear-gradient(45deg, #3b82f6, #60a5fa);
-            color: white;
-            transition: background 0.4s ease;
-        }
-        .day-selector-btn {
-            background-color: #ffffff;
-            color: #4a5568;
-            border: 1px solid #e2e8f0;
-            padding: 0.5rem 0;
-            margin: 0 2px;
-            flex-grow: 1;
-            border-radius: 0.5rem;
-            transition: all 0.3s;
+            transition: all 0.2s ease;
+            border-radius: 12px;
+            padding: var(--spacing-md);
             text-align: center;
-            font-size: 0.85rem;
-            line-height: 1.2;
-            min-width: 40px;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            touch-action: manipulation;
         }
-        .day-selector-btn.active-day {
-            background-color: #3b82f6;
-            color: white;
-            border-color: #3b82f6;
-            box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
-            font-weight: bold;
+        
+        .summary-box:active {
+            transform: scale(0.98);
         }
+        
+        .summary-box h6 {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            margin-bottom: var(--spacing-xs);
+            opacity: 0.8;
+        }
+        
+        .summary-box .value-large {
+            font-size: var(--font-size-3xl);
+            font-weight: 700;
+            line-height: 1;
+            margin: 0;
+        }
+        
+        .summary-box .value-medium {
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            line-height: 1;
+            margin: 0;
+        }
+        
+        .summary-box .value-unit {
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            opacity: 0.8;
+            margin-left: var(--spacing-xs);
+        }
+
+        /* Colores específicos de cajas */
+        .box-consumo {
+            background: linear-gradient(135deg, rgba(52, 199, 89, 0.1) 0%, rgba(52, 199, 89, 0.05) 100%);
+            color: var(--color-success);
+            border: 1px solid rgba(52, 199, 89, 0.2);
+        }
+        
+        .box-gasto {
+            background: linear-gradient(135deg, rgba(255, 59, 48, 0.1) 0%, rgba(255, 59, 48, 0.05) 100%);
+            color: var(--color-danger);
+            border: 1px solid rgba(255, 59, 48, 0.2);
+        }
+        
+        .box-balance {
+            background: linear-gradient(135deg, rgba(0, 122, 255, 0.1) 0%, rgba(0, 122, 255, 0.05) 100%);
+            color: var(--color-primary);
+            border: 1px solid rgba(0, 122, 255, 0.2);
+        }
+        
+        .box-balance-semana {
+            background: linear-gradient(135deg, var(--color-primary) 0%, #5ac8fa 100%);
+            color: var(--color-text-light);
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+            border: none;
+        }
+
+        /* Selector de personas mejorado */
         .person-btn {
-            transition: all 0.3s;
-            border: 2px solid transparent;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid var(--color-border);
+            background-color: var(--color-card-bg);
+            color: var(--color-secondary);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--font-size-lg);
+            touch-action: manipulation;
         }
+        
+        .person-btn:active {
+            transform: scale(0.95);
+        }
+        
         .person-btn.active-person {
-            border-color: #10b981;
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.4);
-            transform: scale(1.05);
+            background-color: var(--color-primary);
+            border-color: var(--color-primary);
+            color: var(--color-text-light);
+            box-shadow: 0 4px 8px rgba(0, 122, 255, 0.3);
         }
-        .log-item {
-            border-bottom: 1px dashed #e2e8f0;
-            padding: 0.75rem 0;
+
+        /* Selector de días optimizado */
+        .day-selector-container {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: var(--spacing-xs);
+            padding: var(--spacing-sm) 0;
         }
-        .log-item:last-child {
-            border-bottom: none;
+        
+        .day-selector-btn {
+            background-color: var(--color-card-bg);
+            color: var(--color-text-dark);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: var(--spacing-sm);
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            touch-action: manipulation;
+            min-height: 64px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
         }
-        .hover-text-danger:hover {
-            color: #dc3545 !important;
+        
+        .day-selector-btn:active {
+            transform: scale(0.95);
         }
-        /* Estilos de carga */
+        
+        .day-selector-btn.active-day {
+            background-color: #cee5ff;
+            color: var(--color-text-dark);
+            border-color: var(--color-primary);
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+        }
+        
+        .day-selector-btn .day-name {
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .day-selector-btn .day-date {
+            font-size: var(--font-size-xs);
+            opacity: 0.7;
+        }
+        
+        .day-selector-btn.today-marker {
+            background-color: rgba(52, 199, 89, 0.1);
+            border-color: var(--color-success);
+        }
+        
+        .day-selector-btn.today-marker:not(.active-day) .day-date {
+            color: var(--color-success);
+            font-weight: 600;
+        }
+
+        /* Navegación de semanas */
+        .week-nav-btn {
+            min-width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            background-color: var(--color-card-bg);
+            color: var(--color-text-dark);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+        }
+        
+        .week-nav-btn:hover:not(:disabled) {
+            background-color: var(--color-background);
+        }
+        
+        .week-nav-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+        
+        .week-nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* Formularios de entrada optimizados */
+        .input-group {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .input-group .form-control {
+            min-height: 52px;
+            font-size: var(--font-size-base);
+            border: 1px solid var(--color-border);
+            border-right: none;
+            padding: var(--spacing-sm) var(--spacing-md);
+        }
+        
+        .input-group .form-control:focus {
+            border-color: var(--color-primary);
+            box-shadow: none;
+        }
+        
+        .input-group button {
+            min-height: 52px;
+            min-width: 52px;
+            font-size: var(--font-size-lg);
+            border: none;
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+        }
+        
+        .input-group button:active {
+            transform: scale(0.95);
+        }
+
+        /* Mensaje del coach */
+        #coachMessage {
+            padding: var(--spacing-md);
+            border-radius: 12px;
+            background: #e8e8e8;
+            color: var(--color-text-dark);
+            font-size: var(--font-size-sm);
+            border: 1px solid rgba(0, 122, 255, 0.2);
+            line-height: 1.5;
+        }
+
+        /* Items del log mejorados */
+        .log-item-card {
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            padding: var(--spacing-md);
+            background-color: var(--color-card-bg);
+            transition: all 0.2s ease;
+        }
+        
+        .log-item-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
+        
+        .meal-category {
+            font-size: var(--font-size-base);
+            font-weight: 600;
+            color: var(--color-text-dark);
+        }
+        
+        .meal-time {
+            font-size: var(--font-size-sm);
+            color: var(--color-secondary);
+            font-weight: 400;
+        }
+        
+        .meal-description {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-dark);
+            word-break: break-word;
+            line-height: 1.5;
+        }
+        
+        .calorie-badge {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            padding: var(--spacing-xs) var(--spacing-md);
+            border-radius: 20px;
+            min-width: 85px;
+            text-align: center;
+            white-space: nowrap;
+        }
+        
+        .delete-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
+            background-color: transparent;
+            color: var(--color-secondary);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+        }
+        
+        .delete-btn:active {
+            transform: scale(0.9);
+            background-color: rgba(255, 59, 48, 0.1);
+            border-color: var(--color-danger);
+            color: var(--color-danger);
+        }
+
+        /* Loading indicator */
         #loadingIndicator {
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.8);
-            z-index: 10000;
+            right: 0;
+            bottom: 0;
+            background-color: var(--color-background);
             display: flex;
-            justify-content: center;
-            align-items: center;
             flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+
+        /* Badge de usuario activo */
+        .user-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+            padding: 4px 12px;
+            background-color: rgba(0, 122, 255, 0.1);
+            border-radius: 12px;
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--color-primary);
+        }
+
+        /* Mejoras para el modal */
+        .modal-content {
+            border-radius: 16px;
+            border: none;
+        }
+        
+        .modal-header {
+            border-bottom: 1px solid var(--color-border);
+            padding: var(--spacing-lg);
+        }
+        
+        .modal-body {
+            padding: var(--spacing-lg);
+        }
+        
+        .modal-footer {
+            border-top: 1px solid var(--color-border);
+            padding: var(--spacing-lg);
+        }
+
+        /* Utilidades de color */
+        .text-success { color: var(--color-success) !important; }
+        .text-danger { color: var(--color-danger) !important; }
+        .text-primary { color: var(--color-primary) !important; }
+        .text-warning { color: var(--color-warning) !important; }
+        
+        .bg-success { background-color: var(--color-success) !important; }
+        .bg-danger { background-color: var(--color-danger) !important; }
+
+        /* Mensajes de carga */
+        .loading-message {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-sm);
+            background-color: rgba(0, 122, 255, 0.05);
+            border-radius: 8px;
+            font-size: var(--font-size-sm);
+        }
+
+        /* Mejoras de accesibilidad para táctil */
+        button, .btn {
+            min-height: 44px;
+            min-width: 44px;
+        }
+        
+        /* Ajustes responsive */
+        @media (max-width: 375px) {
+            .value-large {
+                font-size: var(--font-size-2xl) !important;
+            }
+            
+            .day-selector-btn {
+                min-height: 56px;
+                font-size: 0.7rem;
+            }
+        }
+
+        /* Animaciones sutiles */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-in {
+            animation: fadeIn 0.3s ease-out;
         }
     </style>
 </head>
 <body>
 
-    <!-- Indicador de Carga -->
     <div id="loadingIndicator">
         <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Cargando...</span>
         </div>
-        <p class="mt-3 text-primary">Conectando con la base de datos y autenticando...</p>
+        <p class="mt-3 text-primary fw-medium">Conectando con la base de datos...</p>
     </div>
 
-    <div class="container-fluid py-4" id="summaryContent" style="display:none;">
+    <div class="container-fluid py-3" id="summaryContent" style="display:none;">
 
-        <!-- Header y Selección de Persona -->
-        <div class="row mb-4 align-items-center">
-            <div class="col-12 col-md-6">
-                <h1 class="h3 fw-bold text-primary">Balance Calórico de <span id="activeUserName">Valentín</span></h1>
-                <p class="text-muted small mb-0">Usuario ID: <span id="userIdDisplay" class="fw-light">...</span></p>
+        <!-- Encabezado -->
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div class="flex-grow-1">
+                <h1 class="h4 mb-2">Balance Calórico</h1>
+                <span class="user-badge">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="activeUserName">Valentín</span>
+                </span>
             </div>
-            <div class="col-12 col-md-6 d-flex justify-content-md-end justify-content-center mt-3 mt-md-0 gap-3">
-                <button id="selectValentinBtn" class="btn btn-outline-primary person-btn p-3 rounded-circle" title="Valentín">
-                    <i class="fas fa-male fa-lg"></i> 
+            <div class="d-flex gap-2">
+                <button id="selectValentinBtn" class="btn person-btn" title="Valentín">
+                    <i class="fas fa-male"></i>
                 </button>
-                <button id="selectSofiaBtn" class="btn btn-outline-primary person-btn p-3 rounded-circle" title="Sofía">
-                    <i class="fas fa-female fa-lg"></i> 
+                <button id="selectSofiaBtn" class="btn person-btn" title="Sofía">
+                    <i class="fas fa-female"></i>
                 </button>
             </div>
         </div>
 
         <!-- Navegación Semanal -->
-        <div class="card p-3 mb-4">
+        <div class="card p-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <button id="prevWeekBtn" class="btn btn-outline-secondary btn-sm rounded-pill">
-                    <i class="fas fa-chevron-left"></i> Anterior
+                <button id="prevWeekBtn" class="btn week-nav-btn">
+                    <i class="fas fa-chevron-left"></i>
                 </button>
-                <h5 class="fw-semibold text-center text-secondary mb-0" id="weekRangeDisplay">25 Nov - 01 Dic</h5>
-                <button id="nextWeekBtn" class="btn btn-outline-secondary btn-sm rounded-pill" disabled>
-                    Siguiente <i class="fas fa-chevron-right"></i>
+                <h5 class="fw-semibold text-center mb-0 mx-3" id="weekRangeDisplay">25 Nov - 01 Dic</h5>
+                <button id="nextWeekBtn" class="btn week-nav-btn" disabled>
+                    <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
-            
-            <div id="daySelectorContainer" class="d-flex justify-content-between">
-                <!-- Botones de Día se generan aquí -->
-            </div>
+            <div id="daySelectorContainer" class="day-selector-container"></div>
         </div>
-
-        <!-- Resumen Semanal y Contenido Principal -->
-        <div class="row g-4">
+        
+        <!-- Layout responsivo -->
+        <div class="row g-3">
             
-            <!-- Columna de Resumen Semanal -->
-            <div class="col-12 col-lg-4">
-                <div class="card p-4 h-100 bg-white">
-                    <h5 class="fw-bold text-dark-emphasis mb-3"><i class="fas fa-calendar-alt text-primary me-2"></i> Resumen Semanal</h5>
-                    <div class="d-grid gap-3">
-                        
-                        <div class="summary-box bg-success-subtle text-success">
-                            <h6 class="fw-semibold mb-1">Consumo Total</h6>
-                            <p class="fs-4 fw-bolder mb-0"><span id="totalConsumidoSemana">0</span> Kcal</p>
-                        </div>
-                        
-                        <div class="summary-box bg-danger-subtle text-danger">
-                            <h6 class="fw-semibold mb-1">Gasto Total</h6>
-                            <p class="fs-4 fw-bolder mb-0"><span id="totalGastadoSemana">0</span> Kcal</p>
-                        </div>
-
-                        <div id="balanceNetoSemanaBox" class="summary-box balance-neto-box text-white mt-2">
-                            <h6 class="fw-semibold mb-1">Balance Neto (Semanal)</h6>
-                            <p class="fs-3 fw-bolder mb-0"><span id="netBalanceSemana">0</span> Kcal</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Columna de Detalle Diario y Registro -->
+            <!-- Columna principal (Detalle Diario) -->
             <div class="col-12 col-lg-8">
                 
-                <!-- Resumen Diario (Fila Superior) -->
-                <div class="card p-4 mb-4 bg-white">
+                <!-- Resumen Diario -->
+                <div class="card p-3">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h4 class="fw-bold text-dark-emphasis mb-0">
-                            Detalle Diario: <span id="selectedDayDisplay" class="text-primary">Hoy</span>
-                            <span class="badge bg-secondary-subtle text-secondary fw-normal ms-2 small" id="currentDateDisplay">YYYY-MM-DD</span>
-                        </h4>
+                        <div>
+                            <h4 class="h5 mb-1">
+                                <span id="selectedDayDisplay">Hoy</span>
+                            </h4>
+                            <span class="badge bg-light text-secondary text-xs" id="currentDateDisplay">YYYY-MM-DD</span>
+                        </div>
                     </div>
                     
-                    <div class="row g-3">
-                        <!-- Consumido -->
-                        <div id="consumidoBox" class="col-4 summary-box bg-success-subtle text-success">
-                            <h6 class="fw-semibold mb-1">Consumido</h6>
-                            <p class="fs-4 fw-bolder mb-0"><span id="totalConsumido">0</span> Kcal</p>
+                    <div class="row g-2 mb-3">
+                        <div class="col-12">
+                            <div id="consumidoBox" class="summary-box box-consumo">
+                                <h6>Consumido</h6>
+                                <p class="value-medium"><span id="totalConsumido">0</span> <span class="value-unit">Kcal</span></p>
+                            </div>
                         </div>
                         
-                        <!-- Gastado -->
-                        <div id="gastadoBox" class="col-4 summary-box bg-danger-subtle text-danger">
-                            <h6 class="fw-semibold mb-1">Gastado</h6>
-                            <p class="fs-4 fw-bolder mb-0"><span id="totalGastado">0</span> Kcal</p>
+                        <div class="col-12">
+                            <div id="gastadoBox" class="summary-box box-gasto">
+                                <h6>Gastado</h6>
+                                <p class="value-medium"><span id="totalGastado">0</span> <span class="value-unit">Kcal</span></p>
+                            </div>
                         </div>
 
-                        <!-- Balance Neto Diario -->
-                        <div id="balanceNetoBox" class="col-4 summary-box bg-primary-subtle text-primary">
-                            <h6 class="fw-semibold mb-1">Balance Neto</h6>
-                            <p class="fs-4 fw-bolder mb-0"><span id="netBalance">0</span> Kcal</p>
+                        <div class="col-12">
+                            <div id="balanceNetoBox" class="summary-box box-balance">
+                                <h6>Balance Neto</h6>
+                                <p class="value-medium"><span id="netBalance">0</span> <span class="value-unit">Kcal</span></p>
+                            </div>
                         </div>
                     </div>
                     
-                    <p class="text-center mt-3 fw-bold mb-0 text-dark-emphasis" id="coachMessage">
-                        No hay registros para hoy.
-                    </p>
+                    <div id="coachMessage">No hay registros para hoy.</div>
                 </div>
-                
-                <!-- Registro de Consumo y Gasto (Fila Media) -->
-                <div class="row g-4 mb-4">
-                    <!-- Registro de Consumo -->
+
+                <!-- Formularios de Registro -->
+                <div class="row g-3 mb-3">
                     <div class="col-12 col-md-6">
-                        <div class="card p-3 bg-white h-100">
-                            <h6 class="fw-bold text-success"><i class="fas fa-utensils me-1"></i> Registrar Consumo</h6>
+                        <div class="card p-3">
+                            <h6 class="h6 text-success mb-2">
+                                <i class="fas fa-utensils me-2"></i>Registrar Comida
+                            </h6>
                             <form id="registroConsumoForm">
                                 <div class="input-group">
-                                    <input type="text" id="descripcionConsumo" class="form-control" placeholder="Ej: Tostadas con palta" required minlength="3">
+                                    <input type="text" id="descripcionConsumo" class="form-control" 
+                                           placeholder="Ej: Tostadas con palta" required minlength="3">
                                     <button id="submitConsumoButton" class="btn btn-success" type="submit">
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
-                                <div id="apiConsumoLoading" class="text-center text-success small mt-2" style="display:none;">
-                                    Calculando calorías para <span id="activeUserPlaceholderConsumo" class="fw-semibold">...</span> (IA)...
+                                <div id="apiConsumoLoading" class="loading-message text-success mt-2" style="display:none;">
+                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                    <span>Calculando calorías...</span>
                                 </div>
                             </form>
                         </div>
                     </div>
                     
-                    <!-- Registro de Gasto -->
                     <div class="col-12 col-md-6">
-                        <div class="card p-3 bg-white h-100">
-                            <h6 class="fw-bold text-danger"><i class="fas fa-running me-1"></i> Registrar Gasto</h6>
+                        <div class="card p-3">
+                            <h6 class="h6 text-danger mb-2">
+                                <i class="fas fa-running me-2"></i>Registrar Ejercicio
+                            </h6>
                             <form id="registroGastoForm">
                                 <div class="input-group">
-                                    <input type="text" id="descripcionGasto" class="form-control" placeholder="Ej: 30 minutos de correr intenso" required minlength="3">
+                                    <input type="text" id="descripcionGasto" class="form-control" 
+                                           placeholder="Ej: 30 min de correr" required minlength="3">
                                     <button id="submitGastoButton" class="btn btn-danger" type="submit">
                                         <i class="fas fa-minus"></i>
                                     </button>
                                 </div>
-                                <div id="apiGastoLoading" class="text-center text-danger small mt-2" style="display:none;">
-                                    Calculando gasto calórico para <span id="activeUserPlaceholderGasto" class="fw-semibold">...</span> (IA)...
+                                <div id="apiGastoLoading" class="loading-message text-danger mt-2" style="display:none;">
+                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                    <span>Calculando gasto...</span>
                                 </div>
                             </form>
                         </div>
                     </div>
                 </div>
 
-                <!-- Log de Comidas y Actividades (Fila Inferior) -->
-                <div class="card p-4 bg-white">
-                    <h5 class="fw-bold text-dark-emphasis mb-3"><i class="fas fa-list-ul me-2"></i> Log Detallado del Día</h5>
-                    <div id="foodLog" class="d-grid gap-2">
-                        <!-- Los ítems del log se renderizan aquí -->
+                <!-- Log Detallado -->
+                <div class="card p-3">
+                    <h5 class="h5 mb-3">
+                        <i class="fas fa-list-ul me-2 text-primary"></i>Detalle del Día
+                    </h5>
+                    <div id="foodLog" class="d-flex flex-column gap-2"></div>
+                    <div id="emptyLogMessage" class="text-center p-4" style="display: none;">
+                        <i class="fas fa-mug-hot fa-3x text-secondary mb-3 opacity-50"></i>
+                        <p class="mb-0 text-muted">Aún no hay registros para <span id="emptyLogUser"></span></p>
                     </div>
-                    <div id="emptyLogMessage" class="text-center p-5 border rounded-3 bg-light" style="display: none;">
-                        <i class="fas fa-mug-hot fa-3x text-secondary mb-3"></i>
-                        <p class="mb-0 text-muted">Aún no hay registros para <span id="emptyLogUser"></span> en este día.</p>
+                </div>
+
+            </div>
+
+            <!-- Columna lateral (Resumen Semanal) -->
+            <div class="col-12 col-lg-4">
+                <div class="card p-3">
+                    <h5 class="h5 mb-3">
+                        <i class="fas fa-calendar-week me-2 text-primary"></i>Resumen Semanal
+                    </h5>
+                    <div class="d-flex flex-column gap-2">
+                        <div class="summary-box box-consumo">
+                            <h6>Total Consumido</h6>
+                            <p class="value-medium"><span id="totalConsumidoSemana">0</span> <span class="value-unit">Kcal</span></p>
+                        </div>
+                        
+                        <div class="summary-box box-gasto">
+                            <h6>Total Gastado</h6>
+                            <p class="value-medium"><span id="totalGastadoSemana">0</span> <span class="value-unit">Kcal</span></p>
+                        </div>
+
+                        <div id="balanceNetoSemanaBox" class="summary-box box-balance-semana">
+                            <h6>Balance Neto</h6>
+                            <p class="value-large"><span id="netBalanceSemana">0</span> <span class="value-unit">Kcal</span></p>
+                        </div>
                     </div>
                 </div>
             </div>
+            
         </div>
 
     </div>
 
-    <!-- Modal de Detalles del Log -->
+    <!-- Modal de Detalles -->
     <div class="modal fade" id="logDetailsModal" tabindex="-1" aria-labelledby="logDetailsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header bg-light">
+                <div class="modal-header">
                     <h5 class="modal-title fw-bold" id="logDetailsModalLabel">Detalle de Registros</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="modalLogContent" class="d-grid gap-2">
-                        <!-- Detalles del log se renderizan aquí -->
-                    </div>
+                    <div id="modalLogContent" class="d-flex flex-column gap-2"></div>
                 </div>
                 <div class="modal-footer d-flex justify-content-between align-items-center">
-                    <span id="modalTotalLabel" class="fw-semibold text-muted">Total:</span>
-                    <span id="modalTotalValue" class="px-4 py-2 text-white fw-bolder rounded-pill fs-5 shadow-sm">0 Kcal</span>
+                    <span id="modalTotalLabel" class="fw-semibold text-secondary">Total:</span>
+                    <span id="modalTotalValue" class="px-4 py-2 text-white fw-bold rounded-pill">0 Kcal</span>
                 </div>
             </div>
         </div>
     </div>
 
-
-    <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Archivos de la Aplicación -->
     <script type="module" src="./config.js"></script>
     <script type="module" src="./script.js"></script>
     
