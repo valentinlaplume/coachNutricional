@@ -8,511 +8,9 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     
-    <style>
-        :root {
-            /* Paleta de colores refinada para móvil */
-            --color-primary: #007aff;
-            --color-success: #34c759;
-            --color-danger: #ff3b30;
-            --color-warning: #ff9500;
-            --color-secondary: #8e8e93;
-            --color-background: #f2f2f7;
-            --color-card-bg: #ffffff;
-            --color-text-dark: #1c1c1e;
-            --color-text-light: #ffffff;
-            --color-border: #e5e5ea;
-            
-            /* Sistema de tipografía optimizado para móvil */
-            --font-size-xs: 0.75rem;      /* 12px */
-            --font-size-sm: 0.875rem;     /* 14px */
-            --font-size-base: 1rem;       /* 16px */
-            --font-size-lg: 1.125rem;     /* 18px */
-            --font-size-xl: 1.25rem;      /* 20px */
-            --font-size-2xl: 1.5rem;      /* 24px */
-            --font-size-3xl: 2rem;        /* 32px */
-            --font-size-4xl: 2.5rem;      /* 40px */
-            
-            /* Espaciado consistente */
-            --spacing-xs: 0.25rem;
-            --spacing-sm: 0.5rem;
-            --spacing-md: 1rem;
-            --spacing-lg: 1.5rem;
-            --spacing-xl: 2rem;
-        }
-
-        * {
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        body {
-            background-color: var(--color-background);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            font-size: var(--font-size-base);
-            color: var(--color-text-dark);
-            padding-bottom: var(--spacing-xl);
-            overflow-x: hidden;
-            line-height: 1.5;
-        }
-        
-        /* Contenedor principal con máximo ancho para tablets */
-        .container-fluid {
-            padding-left: var(--spacing-md);
-            padding-right: var(--spacing-md);
-            max-width: 640px;
-            margin: 0 auto;
-        }
-        
-        /* Sistema de tipografía jerárquico */
-        .h4 { 
-            font-size: var(--font-size-2xl);
-            font-weight: 700;
-            color: var(--color-text-dark);
-            margin-bottom: var(--spacing-xs);
-            line-height: 1.2;
-        }
-        
-        .h5 { 
-            font-size: var(--font-size-xl);
-            font-weight: 600;
-            color: var(--color-text-dark);
-            margin-bottom: var(--spacing-sm);
-            line-height: 1.3;
-        }
-        
-        .h6 {
-            font-size: var(--font-size-base);
-            font-weight: 600;
-            color: var(--color-text-dark);
-            margin-bottom: var(--spacing-xs);
-            line-height: 1.4;
-        }
-        
-        p {
-            font-size: var(--font-size-base);
-            margin-bottom: var(--spacing-sm);
-        }
-        
-        .text-muted, .small { 
-            font-size: var(--font-size-sm);
-            color: var(--color-secondary);
-        }
-        
-        .text-xs {
-            font-size: var(--font-size-xs);
-        }
-
-        /* Sistema de tarjetas mejorado */
-        .card {
-            border: none;
-            border-radius: 16px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-            background-color: var(--color-card-bg);
-            margin-bottom: var(--spacing-md);
-        }
-        
-        .card-header-custom {
-            border-bottom: 1px solid var(--color-border);
-            padding: var(--spacing-md);
-            background-color: transparent;
-        }
-        
-        /* Cajas de resumen optimizadas para táctil */
-        .summary-box {
-            cursor: pointer;
-            transition: all 0.2s ease;
-            border-radius: 12px;
-            padding: var(--spacing-md);
-            text-align: center;
-            min-height: 100px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            touch-action: manipulation;
-        }
-        
-        .summary-box:active {
-            transform: scale(0.98);
-        }
-        
-        .summary-box h6 {
-            font-size: var(--font-size-sm);
-            font-weight: 600;
-            margin-bottom: var(--spacing-xs);
-            opacity: 0.8;
-        }
-        
-        .summary-box .value-large {
-            font-size: var(--font-size-3xl);
-            font-weight: 700;
-            line-height: 1;
-            margin: 0;
-        }
-        
-        .summary-box .value-medium {
-            font-size: var(--font-size-2xl);
-            font-weight: 700;
-            line-height: 1;
-            margin: 0;
-        }
-        
-        .summary-box .value-unit {
-            font-size: var(--font-size-sm);
-            font-weight: 500;
-            opacity: 0.8;
-            margin-left: var(--spacing-xs);
-        }
-
-        /* Colores específicos de cajas */
-        .box-consumo {
-            background: linear-gradient(135deg, rgba(52, 199, 89, 0.1) 0%, rgba(52, 199, 89, 0.05) 100%);
-            color: var(--color-success);
-            border: 1px solid rgba(52, 199, 89, 0.2);
-        }
-        
-        .box-gasto {
-            background: linear-gradient(135deg, rgba(255, 59, 48, 0.1) 0%, rgba(255, 59, 48, 0.05) 100%);
-            color: var(--color-danger);
-            border: 1px solid rgba(255, 59, 48, 0.2);
-        }
-        
-        .box-balance {
-            background: linear-gradient(135deg, rgba(0, 122, 255, 0.1) 0%, rgba(0, 122, 255, 0.05) 100%);
-            color: var(--color-primary);
-            border: 1px solid rgba(0, 122, 255, 0.2);
-        }
-        
-        .box-balance-semana {
-            background: linear-gradient(135deg, var(--color-primary) 0%, #5ac8fa 100%);
-            color: var(--color-text-light);
-            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
-            border: none;
-        }
-
-        /* Selector de personas mejorado */
-        .person-btn {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            border: 2px solid var(--color-border);
-            background-color: var(--color-card-bg);
-            color: var(--color-secondary);
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: var(--font-size-lg);
-            touch-action: manipulation;
-        }
-        
-        .person-btn:active {
-            transform: scale(0.95);
-        }
-        
-        .person-btn.active-person {
-            background-color: var(--color-primary);
-            border-color: var(--color-primary);
-            color: var(--color-text-light);
-            box-shadow: 0 4px 8px rgba(0, 122, 255, 0.3);
-        }
-
-        /* Selector de días optimizado */
-        .day-selector-container {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: var(--spacing-xs);
-            padding: var(--spacing-sm) 0;
-        }
-        
-        .day-selector-btn {
-            background-color: var(--color-card-bg);
-            color: var(--color-text-dark);
-            border: 1px solid var(--color-border);
-            border-radius: 10px;
-            padding: var(--spacing-sm);
-            font-size: var(--font-size-sm);
-            font-weight: 500;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            touch-action: manipulation;
-            min-height: 64px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 2px;
-        }
-        
-        .day-selector-btn:active {
-            transform: scale(0.95);
-        }
-        
-        .day-selector-btn.active-day {
-            background-color: #cee5ff;
-            color: var(--color-text-dark);
-            border-color: var(--color-primary);
-            font-weight: 600;
-            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
-        }
-        
-        .day-selector-btn .day-name {
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        
-        .day-selector-btn .day-date {
-            font-size: var(--font-size-xs);
-            opacity: 0.7;
-        }
-        
-        .day-selector-btn.today-marker {
-            background-color: rgba(52, 199, 89, 0.1);
-            border-color: var(--color-success);
-        }
-        
-        .day-selector-btn.today-marker:not(.active-day) .day-date {
-            color: var(--color-success);
-            font-weight: 600;
-        }
-
-        /* Navegación de semanas */
-        .week-nav-btn {
-            min-width: 44px;
-            height: 44px;
-            border-radius: 12px;
-            border: 1px solid var(--color-border);
-            background-color: var(--color-card-bg);
-            color: var(--color-text-dark);
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            touch-action: manipulation;
-        }
-        
-        .week-nav-btn:hover:not(:disabled) {
-            background-color: var(--color-background);
-        }
-        
-        .week-nav-btn:active:not(:disabled) {
-            transform: scale(0.95);
-        }
-        
-        .week-nav-btn:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
-        /* Formularios de entrada optimizados */
-        .input-group {
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        
-        .input-group .form-control {
-            min-height: 52px;
-            font-size: var(--font-size-base);
-            border: 1px solid var(--color-border);
-            border-right: none;
-            padding: var(--spacing-sm) var(--spacing-md);
-        }
-        
-        .input-group .form-control:focus {
-            border-color: var(--color-primary);
-            box-shadow: none;
-        }
-        
-        .input-group button {
-            min-height: 52px;
-            min-width: 52px;
-            font-size: var(--font-size-lg);
-            border: none;
-            transition: all 0.2s ease;
-            touch-action: manipulation;
-        }
-        
-        .input-group button:active {
-            transform: scale(0.95);
-        }
-
-        /* Mensaje del coach */
-        #coachMessage {
-            padding: var(--spacing-md);
-            border-radius: 12px;
-            background: #e8e8e8;
-            color: var(--color-text-dark);
-            font-size: var(--font-size-sm);
-            border: 1px solid rgba(0, 122, 255, 0.2);
-            line-height: 1.5;
-        }
-
-        /* Items del log mejorados */
-        .log-item-card {
-            border: 1px solid var(--color-border);
-            border-radius: 12px;
-            padding: var(--spacing-md);
-            background-color: var(--color-card-bg);
-            transition: all 0.2s ease;
-        }
-        
-        .log-item-card:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-        }
-        
-        .meal-category {
-            font-size: var(--font-size-base);
-            font-weight: 600;
-            color: var(--color-text-dark);
-        }
-        
-        .meal-time {
-            font-size: var(--font-size-sm);
-            color: var(--color-secondary);
-            font-weight: 400;
-        }
-        
-        .meal-description {
-            font-size: var(--font-size-sm);
-            color: var(--color-text-dark);
-            word-break: break-word;
-            line-height: 1.5;
-        }
-        
-        .calorie-badge {
-            font-size: var(--font-size-sm);
-            font-weight: 600;
-            padding: var(--spacing-xs) var(--spacing-md);
-            border-radius: 20px;
-            min-width: 85px;
-            text-align: center;
-            white-space: nowrap;
-        }
-        
-        .delete-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            border: 1px solid var(--color-border);
-            background-color: transparent;
-            color: var(--color-secondary);
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            touch-action: manipulation;
-        }
-        
-        .delete-btn:active {
-            transform: scale(0.9);
-            background-color: rgba(255, 59, 48, 0.1);
-            border-color: var(--color-danger);
-            color: var(--color-danger);
-        }
-
-        /* Loading indicator */
-        #loadingIndicator {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--color-background);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-        }
-        
-        .spinner-border {
-            width: 3rem;
-            height: 3rem;
-        }
-
-        /* Badge de usuario activo */
-        .user-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--spacing-xs);
-            padding: 4px 12px;
-            background-color: rgba(0, 122, 255, 0.1);
-            border-radius: 12px;
-            font-size: var(--font-size-sm);
-            font-weight: 500;
-            color: var(--color-primary);
-        }
-
-        /* Mejoras para el modal */
-        .modal-content {
-            border-radius: 16px;
-            border: none;
-        }
-        
-        .modal-header {
-            border-bottom: 1px solid var(--color-border);
-            padding: var(--spacing-lg);
-        }
-        
-        .modal-body {
-            padding: var(--spacing-lg);
-        }
-        
-        .modal-footer {
-            border-top: 1px solid var(--color-border);
-            padding: var(--spacing-lg);
-        }
-
-        /* Utilidades de color */
-        .text-success { color: var(--color-success) !important; }
-        .text-danger { color: var(--color-danger) !important; }
-        .text-primary { color: var(--color-primary) !important; }
-        .text-warning { color: var(--color-warning) !important; }
-        
-        .bg-success { background-color: var(--color-success) !important; }
-        .bg-danger { background-color: var(--color-danger) !important; }
-
-        /* Mensajes de carga */
-        .loading-message {
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-            padding: var(--spacing-sm);
-            background-color: rgba(0, 122, 255, 0.05);
-            border-radius: 8px;
-            font-size: var(--font-size-sm);
-        }
-
-        /* Mejoras de accesibilidad para táctil */
-        button, .btn {
-            min-height: 44px;
-            min-width: 44px;
-        }
-        
-        /* Ajustes responsive */
-        @media (max-width: 375px) {
-            .value-large {
-                font-size: var(--font-size-2xl) !important;
-            }
-            
-            .day-selector-btn {
-                min-height: 56px;
-                font-size: 0.7rem;
-            }
-        }
-
-        /* Animaciones sutiles */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .animate-in {
-            animation: fadeIn 0.3s ease-out;
-        }
-    </style>
+    <!-- ESTILOS -->
+    <link rel="stylesheet" href="style.css">
+ 
 </head>
 <body>
 
@@ -526,21 +24,30 @@
     <div class="container-fluid py-3" id="summaryContent" style="display:none;">
 
         <!-- Encabezado -->
-        <div class="d-flex justify-content-between align-items-start mb-3">
-            <div class="flex-grow-1">
-                <h1 class="h4 mb-2">Balance Calórico</h1>
-                <span class="user-badge">
-                    <i class="fas fa-user-circle"></i>
-                    <span id="activeUserName">Valentín</span>
-                </span>
+        <div class="d-flex flex-column mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h1 class="h4 mb-0">Balance Calórico</h1>
+                
+                <button id="goToProfileBtn" class="btn btn-primary btn-lg p-2" title="Configurar Perfil">
+                    <i class="fas fa-cog fa-lg"></i>
+                </button>
             </div>
-            <div class="d-flex gap-2">
-                <button id="selectValentinBtn" class="btn person-btn" title="Valentín">
-                    <i class="fas fa-male"></i>
-                </button>
-                <button id="selectSofiaBtn" class="btn person-btn" title="Sofía">
-                    <i class="fas fa-female"></i>
-                </button>
+
+            <div class="d-flex justify-content-between align-items-center">
+                
+                <span class="user-badge d-flex align-items-center">
+                    <i class="fas fa-user-circle me-2"></i>
+                    <span id="activeUserName" class="fw-bold"></span>
+                </span>
+                
+                <div class="d-flex gap-2">
+                    <button id="selectValentinBtn" class="btn person-btn" title="Valentín">
+                        <i class="fas fa-male"></i>
+                    </button>
+                    <button id="selectSofiaBtn" class="btn person-btn" title="Sofía">
+                        <i class="fas fa-female"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -550,7 +57,7 @@
                 <button id="prevWeekBtn" class="btn week-nav-btn">
                     <i class="fas fa-chevron-left"></i>
                 </button>
-                <h5 class="fw-semibold text-center mb-0 mx-3" id="weekRangeDisplay">25 Nov - 01 Dic</h5>
+                <h5 class="fw-semibold text-center mb-0 mx-3" id="weekRangeDisplay"></h5>
                 <button id="nextWeekBtn" class="btn week-nav-btn" disabled>
                     <i class="fas fa-chevron-right"></i>
                 </button>
@@ -660,6 +167,78 @@
 
             </div>
 
+            <div class="col-12 col-lg-4">
+    
+                <div class="card p-3 mb-3" id="macronutrientsCard">
+                    <h5 class="h5 mb-3">
+                        <i class="fas fa-chart-pie me-2 text-info"></i>Macros Diarios
+                    </h5>
+                    <div class="row g-2">
+                        
+                        <div class="col-6">
+                            <div class="macro-item bg-info-subtle p-2 rounded">
+                                <small class="d-block text-info fw-semibold">Proteínas</small>
+                                <p class="mb-0 fw-bold"><span id="proteinasDia">0.0</span> g</p>
+                            </div>
+                        </div>
+                        
+                        <div class="col-6">
+                            <div class="macro-item bg-warning-subtle p-2 rounded">
+                                <small class="d-block text-warning fw-semibold">Carbohidratos</small>
+                                <p class="mb-0 fw-bold"><span id="carbohidratosDia">0.0</span> g</p>
+                            </div>
+                        </div>
+                        
+                        <div class="col-6">
+                            <div class="macro-item bg-danger-subtle p-2 rounded">
+                                <small class="d-block text-danger fw-semibold">Grasas</small>
+                                <p class="mb-0 fw-bold"><span id="grasasDia">0.0</span> g</p>
+                            </div>
+                        </div>
+                        
+                        <div class="col-6">
+                            <div class="macro-item bg-success-subtle p-2 rounded">
+                                <small class="d-block text-success fw-semibold">Fibra</small>
+                                <p class="mb-0 fw-bold"><span id="fibraDia">0.0</span> g</p>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12 mt-3">
+                            <div class="macro-item bg-secondary-subtle p-2 rounded text-center">
+                                <small class="d-block text-secondary fw-semibold">Ultraprocesados (Kcal)</small>
+                                <p class="mb-0 h4 fw-bold"><span id="ultraprocesadosDia">0</span> Kcal</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            
+           
+
+            <div class="card p-3 mb-3">
+                <h5 class="h5 mb-3">
+                    <i class="fas fa-bullseye me-2 text-primary"></i>Metas de Macros
+                </h5>
+                <div class="macro-target-item mb-2">
+                    <label class="d-block fw-semibold text-info">Proteínas</label>
+                    <span class="fw-bold fs-5" id="proteinaProgress"></span>
+                    </div>
+                <div class="macro-target-item mb-2">
+                    <label class="d-block fw-semibold text-warning">Carbohidratos</label>
+                    <span class="fw-bold fs-5" id="carbohidratosProgress"></span>
+                </div>
+                <div class="macro-target-item mb-2">
+                    <label class="d-block fw-semibold text-danger">Grasas</label>
+                    <span class="fw-bold fs-5" id="grasasProgress"></span>
+                </div>
+                
+                <div class="macro-target-item pt-3 border-top mt-2">
+                    <label class="d-block fw-semibold text-success">Kcal Objetivo</label>
+                    <span class="fw-bold fs-4" id="kcalTargetProgress"></span>
+                </div>
+            </div>
+        </div>
+
+
             <!-- Columna lateral (Resumen Semanal) -->
             <div class="col-12 col-lg-4">
                 <div class="card p-3">
@@ -711,6 +290,11 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="./config.js"></script>
     <script type="module" src="./script.js"></script>
-    
+    <script>
+        // Lógica simple de redirección para volver al index.html
+        document.getElementById('goToProfileBtn').addEventListener('click', () => {
+             window.location.href = 'profile.html';
+        });
+    </script>
 </body>
 </html>

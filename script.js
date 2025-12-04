@@ -60,43 +60,114 @@ const perfilUsuario = {
         peso_actual: 75, // kg
         altura: 175, // cm
         peso_objetivo: 72,
-        nivel_actividad: 'moderado', // sedentario, ligero, moderado, activo, muy_activo
-        objetivo: 'perder_peso', // perder_peso, mantener, ganar_musculo
+        nivel_actividad: 'moderado', // sedentario, ligero, moderado, activo, muy_activo // quitar
+        objetivo: 'definición', // perder_peso, mantener, ganar_musculo
         ritmo_semanal: 0.5, // kg por semana
+
         // Calculados automáticamente:
         tmb: 1750,
         tdee: 2712,
         calorias_objetivo: 2212, // TDEE - 500 (para perder 0.5kg/semana)
         fecha_actualizacion: '2025-11-26',
+
+        // NUEVA ADICIÓN: Rangos objetivo de macros para guiar la distribución (en %)
         proteina_min: 105, // 75 * 1.4 = 
         proteina_max: 165, // 75 * 2.2 
+        carbos_rango_porcentaje: '40-50%', // NUEVA ADICIÓN
+        grasas_rango_porcentaje: '25-35%', // NUEVA ADICIÓN
+
+        // --- 2. PREFERENCIAS Y RESTRICCIONES NUTRICIONALES ---
         preferencias: {
             evita_ultraprocesados: true,
-            prefiere_plant_based: false,
-            intolerancia_lactosa: false
+
+            alergias_medicas: ['ninguna'],
+            cantidad_comidas_al_dia: 4, 
+            habilidades_cocina: 'básico', 
+
+            suplementos_actuales: ['creatina'],
+        },
+        
+        // --- 3. CONTEXTO FITNESS Y RENDIMIENTO ---
+        fitness: { 
+            nivel_actividad: 'moderado', // sedentario, ligero, moderado, activo, muy_activo
+            tipo_entrenamiento: 'Fuerza (4 días) + Cardio (1 día)', 
+            frecuencia_semanal: 5, 
+            horario_entrenamiento: 'Tarde (17:30h)', 
+            experiencia_entrenamiento: 'Intermedio-Avanzado', 
+
+            // CORRECCIÓN: Necesitamos un objetivo cuantificable, no solo estético
+            objetivo_estetico: 'Hombros, espalda y abdominales marcados', 
+            objetivo_rendimiento_cuantificable: 'Ser mas atlético', // NUEVA ADICIÓN
+        },
+        
+        // --- 4. SOSTENIBILIDAD Y HÁBITOS DE VIDA ---
+        salud_y_sostenibilidad: { 
+            nivel_estres_dia: 4, // Escala 1-10
+            hora_habitual_dormir: '12:30', // Para evaluar si hay tiempo de recovery
+            hora_habitual_despertar: '08:30', // Para establecer el inicio del ayuno/alimentación
+
+            tiempo_libre_cocina_semanal: '40 mins por dia',
+            dias_flexibilidad_preferidos: ['Sábado noche', 'Domingo tarde/noche'],
+        },
+        
+        preferencias_alimentarias: 
+        {
+            // 1. Opciones Fáciles/Rápidas (Para correcciones de déficit y snacks)
+            opciones_rapidas_faciles: [
+                "Huevo (hervido, revuelto, en todas las versiones)",
+                "Yogurt casero natural (puede ser con: fruta, soja texturizada)",
+                "Atún en lata",
+                "Frutas de todo tipo",
+                "Ricota (como snack o para untar)"
+            ],
+
+            // 2. Fuentes de Carbohidratos para Energía y Fibra (Pre/Post-entrenamiento)
+            carbohidratos_favoritos: [
+                "Pan integral de masa madre con mix semillas en el borde",
+                "Frutas de todo tipo",
+                "Zapallo",
+                "Papa",
+                "Batata",
+                "Arvejas",
+                "Lentejas"
+            ],
+
+            // 3. Fuentes de Proteína Principal (Para alcanzar los objetivos diarios)
+            proteinas_favoritas: [
+                "Pollo (cualquier corte)",
+                "Carne (cualquier corte)",
+                "Pescado",
+                "Atún en lata",
+                "Huevo",
+                "Ricota",
+                "Soja texturizada",
+                "Yogurt casero natural"
+            ],
+
+            // 4. Ingredientes Base y Complementos (Para la calidad nutricional)
+            ingredientes_base_complementos: [
+                "Verduras (Espinaca, Zapallo, Papa, Batata, Cebolla, Morrón)",
+                "Salsa de tomate",
+                "Miel (para endulzar/energía)",
+                "Café",
+                "Mate argentino",
+                "Agua"
+            ],
+
+            // 5. Platos o Preparaciones Favoritas (Para sugerencias de comidas completas)
+            platos_favoritos_completos: [
+                "Tarta de espinaca mixeada con pollo",
+                "Lentejas (guiso/estofado)",
+                "Preparaciones con Soja Texturizada"
+            ],
+
+            preferencias_de_verduras: [
+                'espinaca', 'zapallo', 'papa', 'morrón', 'cebolla', 
+                'salsa de tomate', 'zanahoria', 'batata', 'arvejas', 'lentejas'
+            ],
         }
     },
-    sofia: {
-        edad: 25,
-        sexo: 'femenino',
-        peso_actual: 60,
-        altura: 165,
-        peso_objetivo: 3,
-        nivel_actividad: 'moderado',
-        objetivo: 'perder_peso',
-        ritmo_semanal: 0.25,
-        tmb: 1380,
-        tdee: 1897,
-        calorias_objetivo: 1647, // TDEE - 250
-        fecha_actualizacion: '2025-11-26',
-        proteina_min: 84, // 60 * 1.4 
-        proteina_max: 132, // 60 * 2.2
-        preferencias: {
-            evita_ultraprocesados: true,
-            prefiere_plant_based: false,
-            intolerancia_lactosa: false
-        }
-    }
+   // futuros usuarios
 };
 
 let activePersonId = PEOPLE[0].id;
@@ -145,6 +216,21 @@ const elements = {
     summaryContent: document.getElementById('summaryContent'),
     selectValentinBtn: document.getElementById('selectValentinBtn'),
     selectSofiaBtn: document.getElementById('selectSofiaBtn'),
+
+    // --- NUEVOS ELEMENTOS PARA MACROS DIARIOS ---
+    proteinasDiaDisplay: document.getElementById('proteinasDia'),
+    carbohidratosDiaDisplay: document.getElementById('carbohidratosDia'),
+    grasasDiaDisplay: document.getElementById('grasasDia'),
+    fibraDiaDisplay: document.getElementById('fibraDia'),
+    ultraprocesadosDiaDisplay: document.getElementById('ultraprocesadosDia'),
+    
+    // --- NUEVOS ELEMENTOS PARA METAS DIARIAS (Progreso) ---
+    proteinaProgress: document.getElementById('proteinaProgress'),
+    carbohidratosProgress: document.getElementById('carbohidratosProgress'),
+    grasasProgress: document.getElementById('grasasProgress'),
+    kcalTargetProgress: document.getElementById('kcalTargetProgress'), // Muestra Consumido / Objetivo
+    kcalRestanteDisplay: document.getElementById('kcalRestanteDisplay'), // Opcional, para el feedback extra
+    
     
     // Modal
     logDetailsModal: new bootstrap.Modal(document.getElementById('logDetailsModal')),
@@ -217,9 +303,18 @@ async function initializeFirebase() {
         } else {
             await signInAnonymously(auth);
         }
+
+        const userId_valentin = '8GWJpR3XAnWY4uZW87CDsMSDbRD3';
+        const userId_sofia = 'jcyKJTaWuKTc2Kb51Zbj7q5yPr62';
+
         
-        userId = auth.currentUser?.uid || crypto.randomUUID();
-        
+        userId = (activePersonId === 'valentin' ? userId_valentin : userId_sofia) || auth.currentUser?.uid
+        console.log(auth)
+        console.log(auth.currentUser)
+        console.log(activePersonId)
+        console.log(userId)
+        console.log(typeof(userId))
+
         currentWeekStart = getWeekStart(new Date());
         setupWeekNavigation();
         setupPersonButtons();
@@ -390,6 +485,7 @@ function updateWeekSummaryUI() {
     }
     elements.balanceNetoSemanaBox.style.background = backgroundStyle;
 }
+
 // Nueva función específica para mensajes del coach
 async function fetchGeminiCoachMessage(systemPrompt, userQuery) {
     const payload = {
@@ -482,7 +578,7 @@ function sanitizeHTML(html) {
     return temp.innerHTML;
 }
 
-function calcularMacrosDia(log_consumido) {
+function calcularMacrosDia_OLD(log_consumido) {
     let prote = 0, carbs = 0, grasas = 0, fibra = 0, ultraprocesados = 0;
 
     log_consumido.forEach(item => {
@@ -500,6 +596,49 @@ function calcularMacrosDia(log_consumido) {
         fibra_dia: fibra,
         ultraprocesados_dia: ultraprocesados
     };
+}
+/**
+ * Calcula la suma total de macronutrientes y las Kcal de ultraprocesados para el día.
+ * @param {Array<Object>} log_consumido - El log de comidas consumidas.
+ * @returns {Object} Un objeto con las sumas totales de macros y Kcal de ultraprocesados.
+ */
+function calcularMacrosDia(log_consumido) {
+    if (!log_consumido || log_consumido.length === 0) {
+        return {
+            proteinas_dia: 0,
+            carbohidratos_dia: 0,
+            grasas_dia: 0,
+            fibra_dia: 0,
+            ultraprocesados_dia: 0, // Esto son Kcal
+        };
+    }
+
+    const totales = log_consumido.reduce((acc, item) => {
+        acc.proteinas_dia += item.proteinas || 0;
+        acc.carbohidratos_dia += item.carbohidratos || 0;
+        acc.grasas_dia += item.grasas || 0;
+        acc.fibra_dia += item.fibra || 0;
+        
+        // LÓGICA CORREGIDA: Sumar Kcal SOLO si es 'ultraprocesado'
+        if (item.procesado === 'ultraprocesado') { 
+            acc.ultraprocesados_dia += item.kcal || 0; 
+        }
+        
+        return acc;
+    }, {
+        proteinas_dia: 0,
+        carbohidratos_dia: 0,
+        grasas_dia: 0,
+        fibra_dia: 0,
+        ultraprocesados_dia: 0,
+    });
+
+    // Redondeo para todas las propiedades
+    Object.keys(totales).forEach(key => {
+        totales[key] = parseFloat(totales[key].toFixed(1));
+    });
+
+    return totales;
 }
 
 
@@ -573,12 +712,19 @@ REGLAS DE RESPUESTA (muy importantes):
 2. Proporciona retroalimentación específica y personalizada basada en los datos.
 3. Si está muy por encima o por debajo del objetivo, sugiere ajustes concretos, seguros y razonables.
 4. Sé motivador pero honesto.
-5. Responde en formato de items enumerados de forma obligatoria (máximo 5 items), que estos items tengan maximo 3 oraciones, y en cada item enumerado un salto de linea html.
+5. Responde en formato de items enumerados de forma obligatoria (**6 items máximo**). Cada item debe tener máximo 3 oraciones.
 6. Usa emojis relevantes, sin saturar.
 7. Si hay información de macronutrientes o calidad nutricional, intégrala en la evaluación de manera breve.
 8. Puedes usar <strong> para resaltar palabras importantes
 `;
-    return await fetchGeminiCoachMessage(systemPrompt, userQuery);
+return await fetchGeminiCoachMessage(systemPrompt, userQuery);
+
+// 7. **Evaluación Profunda:** Analiza la distribución de macros, la calidad nutricional, la **hidratación total** y la eficacia del **timing nutricional (Pre/Post)** en relación al entrenamiento.
+// 8. **PUNTO DE CONTROL (Solo en Análisis 2):** Si el campo 'CONTEXTO Y RETROALIMENTACIÓN PREVIA' indica que el Análisis 1 está disponible, el **primer ítem enumerado** debe ser un chequeo directo sobre si las correcciones urgentes (ej. aumentar calorías) se implementaron.
+// 9. **Tono (Análisis 1 vs Análisis 2):**
+//    - **Si es un Análisis Parcial (~18:00h):** Tono urgente y proactivo. Enfócate en el riesgo de déficit inminente y las necesidades inmediatas de combustible para la cena.
+//    - **Si es un Análisis Final:** Tono retrospectivo, enfocado en la sostenibilidad, la recuperación y la planificación del día siguiente.
+// `;
 }
 
 
@@ -591,9 +737,30 @@ async function renderSelectedDay() {
         log_consumido: [],
         log_gastado: []
     };
+    
+    currentLogData = data;
+
+    const perfilUsuarioOnline = perfilUsuario[activePersonId];
+
     console.log("renderSelectedDay")
     console.log(data)
-    currentLogData = data;
+
+    // === INICIO DE INTEGRACIÓN DE MACROS ===
+    const macrosDiarias = calcularMacrosDia(currentLogData.log_consumido);
+    renderMacronutrients(macrosDiarias);
+    // === FIN DE INTEGRACIÓN DE MACROS ===
+    
+    // === INICIO DE INTEGRACIÓN DE METAS (NUEVO) ===
+    console.log(perfilUsuarioOnline)
+    if (perfilUsuarioOnline) {
+        const metas = calcularMetasDiarias(
+            perfilUsuarioOnline, 
+            macrosDiarias, 
+            currentLogData.consumido || 0
+        );
+        renderTargetProgress(metas); // Nueva función para renderizar el progreso
+    }
+    // === FIN DE INTEGRACIÓN DE METAS ===
 
     const isToday = selectedDay === todayISO;
     
@@ -645,8 +812,7 @@ async function renderSelectedDay() {
     elements.loadingIndicator.style.display = 'none';
     elements.summaryContent.style.display = 'block';
 
-    // ✅ AHORA SÍ: Generar mensaje del coach de forma asíncrona (NO bloqueante)
-    const perfilUsuarioOnline = perfilUsuario[activePersonId];
+    // // ✅ AHORA SÍ: Generar mensaje del coach de forma asíncrona (NO bloqueante)
 
     if (consumed === 0 && expended === 0) {
         elements.coachMessage.textContent = `No hay registros para ${isToday ? 'hoy' : formatDate(selectedDay)}.`;
@@ -922,47 +1088,6 @@ function setupPersonButtons() {
     elements.selectSofiaBtn.addEventListener('click', () => changePerson('sofia', 'Sofía'));
 }
 
-function parseNutriResponse(raw) {
-    if (!raw) return null;
-
-    // Si Gemini devolvió solo un número (ej: "1200")
-    if (!isNaN(raw)) {
-        const kcal = Number(raw);
-        return {
-            kcal,
-            proteinas: 0,
-            carbohidratos: 0,
-            grasas: 0,
-            fibra: 0,
-            procesado: "desconocido"
-        };
-    }
-
-    if (typeof raw !== "string") return null;
-
-    // Intentar extraer JSON del texto
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-
-    try {
-        const parsed = JSON.parse(match[0]);
-
-        return {
-            kcal: Number(parsed.kcal) || 0,
-            proteinas: Number(parsed.proteinas) || 0,
-            carbohidratos: Number(parsed.carbohidratos) || 0,
-            grasas: Number(parsed.grasas) || 0,
-            fibra: Number(parsed.fibra) || 0,
-            procesado: parsed.procesado ?? "desconocido"
-        };
-
-    } catch (e) {
-        console.error("JSON parse error:", e);
-        return null;
-    }
-}
-
-
 const FOOD_SCHEMA = {
     type: "OBJECT",
     properties: {
@@ -1179,10 +1304,6 @@ elements.registroConsumoForm.addEventListener('submit', async (e) => {
         elements.apiConsumoLoading.style.display = 'none';
         elements.submitConsumoButton.disabled = false;
     }
-    
-    
-
-   
 });
 
 
@@ -1248,6 +1369,114 @@ elements.registroGastoForm.addEventListener('submit', async (e) => {
 });
 
 
+/**
+ * Renderiza los totales de macronutrientes en el card de macros.
+ * @param {Object} macros - El objeto devuelto por calcularMacrosDia.
+ */
+function renderMacronutrients(macros) {
+    // Redondeo final para la visualización (cero decimales para ultraprocesados, uno para macros)
+    elements.proteinasDiaDisplay.textContent = Math.round(macros.proteinas_dia * 10) / 10;
+    elements.carbohidratosDiaDisplay.textContent = Math.round(macros.carbohidratos_dia * 10) / 10;
+    elements.grasasDiaDisplay.textContent = Math.round(macros.grasas_dia * 10) / 10;
+    elements.fibraDiaDisplay.textContent = Math.round(macros.fibra_dia * 10) / 10;
+    // Asumo que ultraprocesados_dia contiene las Kcal
+    elements.ultraprocesadosDiaDisplay.textContent = Math.round(macros.ultraprocesados_dia); 
+}
+
+// Asegúrate de que los elementos sean accesibles, por ejemplo:
+// elements.proteinaMetaDisplay = document.getElementById('proteinaMetaDisplay');
+
+/**
+ * Renderiza el progreso de las metas calóricas y de macronutrientes.
+ * @param {Object} metas - El objeto devuelto por calcularMetasDiarias.
+ */
+function renderTargetProgress(metas) {
+    // Función para formatear las metas de gramos (ej: "50g / 150g")
+    const formatGoal = (actual, meta) => `${Math.round(actual)}g / ${Math.round(meta)}g`;
+    
+    // Función para formatear las metas de Kcal (ej: "1200 Kcal / 2212 Kcal")
+    const formatKcalGoal = (actual, meta) => `${Math.round(actual)} Kcal / ${Math.round(meta)} Kcal`;
+    
+    // 1. Actualizar Proteínas (Gramos)
+    if (elements.proteinaProgress) {
+        elements.proteinaProgress.textContent = formatGoal(metas.proteina.actual, metas.proteina.meta);
+    }
+    
+    // 2. Actualizar Carbohidratos (Gramos)
+    if (elements.carbohidratosProgress) {
+        elements.carbohidratosProgress.textContent = formatGoal(metas.carbohidratos.actual, metas.carbohidratos.meta);
+    }
+
+    // 3. Actualizar Grasas (Gramos)
+    if (elements.grasasProgress) {
+        elements.grasasProgress.textContent = formatGoal(metas.grasas.actual, metas.grasas.meta);
+    }
+
+    // 4. Actualizar Kcal (Total Consumido vs. Total Objetivo)
+    if (elements.kcalTargetProgress) {
+        elements.kcalTargetProgress.textContent = formatKcalGoal(metas.kcal.actual, metas.kcal.meta);
+    }
+    
+    // 5. Feedback Visual (Kcal Restante/Excedente)
+    if (elements.kcalRestanteDisplay) {
+        let texto;
+        if (metas.kcal.restante > 0) {
+            texto = `(Quedan ${Math.round(metas.kcal.restante)} Kcal)`;
+            elements.kcalRestanteDisplay.className = 'text-success fw-bold';
+        } else if (metas.kcal.restante === 0) {
+            texto = `(¡Meta de Kcal alcanzada!)`;
+            elements.kcalRestanteDisplay.className = 'text-info fw-bold';
+        } else {
+            // El campo .restante en metas.kcal tiene Math.max(0, ...),
+            // por lo que si se excede la meta, usamos el valor absoluto de la diferencia real.
+            const excedente = metas.kcal.actual - metas.kcal.meta;
+            texto = `(Excedido por ${Math.round(excedente)} Kcal)`;
+            elements.kcalRestanteDisplay.className = 'text-danger fw-bold';
+        }
+        
+        elements.kcalRestanteDisplay.textContent = texto;
+    }
+}
+
+/**
+ * Compara los macros consumidos con los objetivos del perfil.
+ * @param {Object} perfil - El objeto perfilUsuario[activePersonId].
+ * @param {Object} macrosConsumidas - El resultado de calcularMacrosDia().
+ * @param {number} caloriasConsumidas - El total 'consumido' del día.
+ * @returns {Object} Un objeto con el progreso y las metas.
+ */
+function calcularMetasDiarias(perfil, macrosConsumidas, caloriasConsumidas) {
+    
+    // --- 1. Definir Objetivos del Perfil ---
+    const objetivoKcal = perfil.calorias_objetivo;
+    const objetivoProteina = perfil.peso_actual * 2//(perfil.proteina_min + perfil.proteina_max) / 2; // Usamos el promedio
+
+    // Calcular objetivos de Carbos y Grasas a partir de porcentajes de Kcal Objetivo
+    // 1g Carbos = 4 Kcal | 1g Proteína = 4 Kcal | 1g Grasa = 9 Kcal
+    
+    // Asumo que los rangos de Carbos y Grasas son strings '40-50%' y '25-35%'
+    const carbosPorcentaje = parseFloat(perfil.carbos_rango_porcentaje.split('-')[0]) / 100; // Usamos el mínimo del rango
+    const grasasPorcentaje = parseFloat(perfil.grasas_rango_porcentaje.split('-')[0]) / 100; // Usamos el mínimo del rango
+    
+    const objetivoCarbos = Math.round((objetivoKcal * carbosPorcentaje) / 4); // (Kcal * %) / 4 Kcal/g
+    const objetivoGrasas = Math.round((objetivoKcal * grasasPorcentaje) / 9); // (Kcal * %) / 9 Kcal/g
+
+    // --- 2. Calcular el Progreso ---
+    const progreso = {
+        kcal: { meta: objetivoKcal, actual: caloriasConsumidas, restante: objetivoKcal - caloriasConsumidas },
+        proteina: { meta: objetivoProteina, actual: macrosConsumidas.proteinas_dia, restante: objetivoProteina - macrosConsumidas.proteinas_dia },
+        carbohidratos: { meta: objetivoCarbos, actual: macrosConsumidas.carbohidratos_dia, restante: objetivoCarbos - macrosConsumidas.carbohidratos_dia },
+        grasas: { meta: objetivoGrasas, actual: macrosConsumidas.grasas_dia, restante: objetivoGrasas - macrosConsumidas.grasas_dia },
+        
+        // Indicador de Ultraprocesados (la meta es 0 Kcal)
+        ultraprocesados: { meta: 0, actual: macrosConsumidas.ultraprocesados_dia },
+    };
+    
+    // Asegurar que las calorías restantes no sean negativas
+    progreso.kcal.restante = Math.max(0, progreso.kcal.restante);
+
+    return progreso;
+}
 
 // --- Ejecución Inicial ---
 initializeFirebase();
