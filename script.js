@@ -68,23 +68,31 @@ const perfilUsuario = {
         edad: 25,
         sexo: 'masculino',
         peso_actual: 75, // kg
-        altura: 175, // cm
+        altura: 174, // cm
         peso_objetivo: 72,
         nivel_actividad: 'moderado', // sedentario, ligero, moderado, activo, muy_activo // quitar
         objetivo: 'definición', // perder_peso, mantener, ganar_musculo
         ritmo_semanal: 0.5, // kg por semana
 
         // Calculados automáticamente:
-        tmb: 1750,
-        tdee: 2712,
-        calorias_objetivo: 2212, // TDEE - 500 (para perder 0.5kg/semana)
-        fecha_actualizacion: '2025-11-26',
+        tmb: 1718,
+        tdee: 2835,
+        calorias_objetivo: 2300, // TDEE - 500 (para perder 0.5kg/semana)
+        fecha_actualizacion: '2025-12-06',
+
+        // RANGOS OBJETIVO DE MACROS (en gramos y porcentajes ajustados a 2345 kcal):
+        // Proteína: 1.4 g/kg a 2.2 g/kg
+        proteina_min: 105, // 75 kg * 1.4 g/kg
+        proteina_max: 165, // 75 kg * 2.2 g/kg 
 
         // NUEVA ADICIÓN: Rangos objetivo de macros para guiar la distribución (en %)
-        proteina_min: 105, // 75 * 1.4 = 
-        proteina_max: 165, // 75 * 2.2 
-        carbos_rango_porcentaje: '40-50%', // NUEVA ADICIÓN
-        grasas_rango_porcentaje: '25-35%', // NUEVA ADICIÓN
+        // Distribución basada en 150g de Proteína (600 kcal) y 25% de Grasas (65g, 585 kcal)
+            // Carbos restantes: 2345 - 600 - 585 = 1160 kcal
+            // % Carbos: 1160 / 2345 * 100 = 49.5%
+            // % Grasas: 585 / 2345 * 100 = 25%
+
+        carbos_rango_porcentaje: '40-55%', 
+        grasas_rango_porcentaje: '20-30%', 
 
         // --- 2. PREFERENCIAS Y RESTRICCIONES NUTRICIONALES ---
         preferencias: {
@@ -238,6 +246,7 @@ const elements = {
     proteinaProgress: document.getElementById('proteinaProgress'),
     carbohidratosProgress: document.getElementById('carbohidratosProgress'),
     grasasProgress: document.getElementById('grasasProgress'),
+    fibraProgress: document.getElementById('fibraProgress'),
     kcalTargetProgress: document.getElementById('kcalTargetProgress'), // Muestra Consumido / Objetivo
     kcalRestanteDisplay: document.getElementById('kcalRestanteDisplay'), // Opcional, para el feedback extra
     
@@ -651,94 +660,6 @@ function calcularMacrosDia(log_consumido) {
     return totales;
 }
 
-
-// // Función actualizada para generar mensaje del coach
-// async function generarMensajeCoach(consumido, gastado, perfilUsuario) {
-//     const balance = consumido - gastado;
-//     const deficit_esperado = perfilUsuario.tdee - perfilUsuario.calorias_objetivo;
-//     const deficit_real = perfilUsuario.tdee - balance;
-
-//     const data = weekData[selectedDay] || {
-//         consumido: 0,
-//         gastado: 0,
-//         log_consumido: [],
-//         log_gastado: []
-//     };
-    
-//     currentLogData = data;
-
-//      console.log("generarMensajeCoach")
-//     console.log(data)
-
-//     const { 
-//         proteinas_dia, 
-//         carbohidratos_dia, 
-//         grasas_dia, 
-//         fibra_dia, 
-//         ultraprocesados_dia 
-//     }    = calcularMacrosDia(currentLogData.log_consumido);
-
-    
-//     const systemPrompt = `Actúa como un nutricionista y coach personal profesional, especializado en nutrición basada en evidencia, guías internacionales (EFSA, FDA, ISSN) y el enfoque práctico del nutricionista Francis Holway.
-// Tu prioridad es generar recomendaciones científicamente válidas y personalizadas, evitando mitos, exageraciones y cualquier afirmación sin respaldo empírico.
-
-// PERFIL DEL USUARIO:
-// - Nombre: ${activePersonName}
-// - Edad: ${perfilUsuario.edad} años
-// - Sexo: ${perfilUsuario.sexo}
-// - Peso actual: ${perfilUsuario.peso_actual} kg
-// - Peso objetivo: ${perfilUsuario.peso_objetivo} kg
-// - Altura: ${perfilUsuario.altura} cm
-// - Nivel de actividad: ${perfilUsuario.nivel_actividad}
-// - TMB (metabolismo basal): ${perfilUsuario.tmb} kcal/día
-// - TDEE (gasto diario total): ${perfilUsuario.tdee} kcal/día
-// - Objetivo calórico: ${perfilUsuario.calorias_objetivo} kcal/día
-// - Meta: ${perfilUsuario.objetivo} a ${perfilUsuario.ritmo_semanal} kg/semana
-
-// DATOS DEL DÍA:
-// - Calorías consumidas: ${consumido} kcal
-// - Calorías gastadas (ejercicio): ${gastado} kcal
-// - Balance neto: ${balance} kcal
-// - Déficit real vs TDEE: ${deficit_real} kcal
-// - Déficit esperado: ${deficit_esperado} kcal
-
-// MACRONUTRIENTES DEL DÍA:
-// - Proteínas ingeridas: ${proteinas_dia} g
-// - Carbohidratos ingeridos: ${carbohidratos_dia} g
-// - Grasas ingeridas: ${grasas_dia} g
-// - Fibra ingerida: ${fibra_dia} g
-// - Alimentos ultraprocesados: ${ultraprocesados_dia}
-
-
-// REGLAS DE RESPUESTA (muy importantes):
-// - Utiliza únicamente afirmaciones consistentes con evidencia científica.
-// - No inventes datos fisiológicos ni valores nutricionales.
-// - Sé preciso, directo y orientado a decisiones accionables.
-// - Evita lenguaje alarmista; prioriza la claridad y la adherencia.
-// - Mantén un tono profesional, motivador y equilibrado.`;
-
-//     const userQuery = `INSTRUCCIONES:
-// 1. Evalúa si el usuario está cumpliendo su objetivo calórico.
-// 2. Proporciona retroalimentación específica y personalizada basada en los datos.
-// 3. Si está muy por encima o por debajo del objetivo, sugiere ajustes concretos, seguros y razonables.
-// 4. Sé motivador pero honesto.
-// 5. Responde en formato de items enumerados de forma obligatoria (**6 items máximo**). Cada item debe tener máximo 3 oraciones.
-// 6. Usa emojis relevantes, sin saturar.
-// 7. Si hay información de macronutrientes o calidad nutricional, intégrala en la evaluación de manera breve.
-// 8. Puedes usar <strong> para resaltar palabras importantes
-// `;
-// return await fetchGeminiCoachMessage(systemPrompt, userQuery);
-
-// // 7. **Evaluación Profunda:** Analiza la distribución de macros, la calidad nutricional, la **hidratación total** y la eficacia del **timing nutricional (Pre/Post)** en relación al entrenamiento.
-// // 8. **PUNTO DE CONTROL (Solo en Análisis 2):** Si el campo 'CONTEXTO Y RETROALIMENTACIÓN PREVIA' indica que el Análisis 1 está disponible, el **primer ítem enumerado** debe ser un chequeo directo sobre si las correcciones urgentes (ej. aumentar calorías) se implementaron.
-// // 9. **Tono (Análisis 1 vs Análisis 2):**
-// //    - **Si es un Análisis Parcial (~18:00h):** Tono urgente y proactivo. Enfócate en el riesgo de déficit inminente y las necesidades inmediatas de combustible para la cena.
-// //    - **Si es un Análisis Final:** Tono retrospectivo, enfocado en la sostenibilidad, la recuperación y la planificación del día siguiente.
-// // `;
-// }
-
-
-
 /**
  * Guarda el mensaje del coach en Firestore para el día y momento específicos.
  * @param {string} userId - ID del usuario.
@@ -930,13 +851,13 @@ REGLAS DE RESPUESTA (muy importantes):
     2. Debes generar **EXACTAMENTE 6 ítems**. Cada ítem debe tener un máximo de 4 oraciones.
     3. Usa emojis relevantes, sin saturar, al inicio de cada ítem.
     4. Usa la etiqueta <strong> para resaltar palabras clave, métricas o palabras importantes.
-    5. Finaliza la respuesta con un salto de línea HTML.
+    5. Finaliza la respuesta de cada ítem (son 6) con un salto de línea HTML.
     
     // ESTA ES LA LISTA OBLIGATORIA DE TEMAS PARA LOS 6 ÍTEMS:
         
         1. 🟢 **Evaluación Calórica y Adherencia:** Evalúa el Déficit Real (${deficit_real} kcal) comparado con el Déficit Esperado (${deficit_esperado} kcal).
         2. 💪 **Revisión de Proteínas:** Evalúa si ${proteinas_dia} g están dentro del rango objetivo (${perfilUsuario.proteina_min}g - ${perfilUsuario.proteina_max}g) y su impacto en la <strong>Definición</strong>.
-        3. ⏱️ **Timing Nutricional (Pre/Post-Entreno):** Analiza la distribución de carbohidratos alrededor del horario de entrenamiento (${perfilUsuario.fitness.horario_entrenamiento}) y cómo afecta el rendimiento.
+        3. ⏱️ **Timing Nutricional (Pre/Post-Entreno):** Analiza la distribución de carbohidratos alrededor del horario de entrenamiento (${perfilUsuario.fitness.horario_entrenamiento}) y cómo afecta el rendimiento (Si es que ese dia entrenó, si no evalualo desde otra mirada).
         4. 🥕 **Fibra y Calidad Nutricional:** Evalúa la ingesta de <strong>Fibra</strong> (${fibra_dia} g) y la cantidad de <strong>Ultraprocesados</strong>, ofreciendo consejos de saciedad.
         5. 🧭 **Ajuste Prioritario y Recomendación:** Sugiere la corrección más urgente para el día siguiente o la recomendación más importante. Menciona un plato o ingrediente de las preferencias alimentarias (${Object.values(perfilUsuario.preferencias_alimentarias).flat().join(', ').substring(0, 100)}...) que lo facilite.
         6. 💤 **Recuperación y Planificación:** Conecta la nutrición con el nivel de estrés (${perfilUsuario.salud_y_sostenibilidad.nivel_estres_dia}/10) y la <strong>planificación de la cena</strong> o el desayuno de mañana.
@@ -1138,6 +1059,7 @@ function getMealCategory(dateObj) {
     }
 }
 
+
 function renderCombinedLog(logConsumed, logExpended) {
     elements.foodLog.innerHTML = '';
     
@@ -1145,12 +1067,12 @@ function renderCombinedLog(logConsumed, logExpended) {
         ...(logConsumed || []).map(item => ({
             ...item,
             type: 'consumo',
-            sortKey: new Date(item.hora).getTime() // CAMBIO: time -> hora
+            sortKey: new Date(item.hora).getTime()
         })),
         ...(logExpended || []).map(item => ({
             ...item,
             type: 'gasto',
-            sortKey: new Date(item.hora).getTime() // CAMBIO: time -> hora
+            sortKey: new Date(item.hora).getTime()
         }))
     ];
     
@@ -1163,7 +1085,7 @@ function renderCombinedLog(logConsumed, logExpended) {
     const sortedLog = combinedLog.sort((a, b) => a.sortKey - b.sortKey);
 
     sortedLog.forEach(item => {
-        const dateObj = new Date(item.hora); // CAMBIO: time -> hora
+        const dateObj = new Date(item.hora);
         const time = dateObj.toLocaleTimeString('es-AR', { 
             hour: '2-digit', 
             minute: '2-digit',
@@ -1177,13 +1099,47 @@ function renderCombinedLog(logConsumed, logExpended) {
         const listItem = document.createElement('div');
         listItem.className = 'log-item-card animate-in';
         
-        const deleteButtonHTML = (selectedDay === todayISO) ? `
+        const deleteButtonHTML = `
             <button type="button" class="delete-btn" 
                 onclick="window.deleteLogItem('${item.type}', '${item.id}', ${item.kcal})" 
                 aria-label="Eliminar registro">
                 <i class="fas fa-trash"></i>
             </button>
-        ` : '';
+        ` ;
+
+        // --- NUEVO CÓDIGO: Generar HTML para los Macros (solo si es consumo) ---
+        let macrosHTML = '';
+        if (isConsumption) {
+            // Aseguramos que los valores sean números y los redondeamos a 1 decimal
+            const p = Math.round(item.proteinas * 10) / 10;
+            const c = Math.round(item.carbohidratos * 10) / 10;
+            const g = Math.round(item.grasas * 10) / 10;
+            const f = Math.round(item.fibra * 10) / 10;
+            
+          macrosHTML = `
+            <div class="macro-details mt-2 pt-2 border-top border-light-subtle">
+                <div class="row small text-secondary">
+                    <!-- Primera fila -->
+                    <div class="col-12">
+                        🥩 Proteínas: <strong>${p}g</strong>
+                    </div>
+                    <div class="col-12">
+                        🍚 Carbohidratos: <strong>${c}g</strong>
+                    </div>
+                    <!-- Segunda fila -->
+                    <div class="col-12">
+                    🥑 Grasas: <strong>${g}g</strong>
+                    </div>
+                    <div class="col-12">
+                        🥕 Fibra: <strong>${f}g</strong>
+                    </div>
+                </div>
+            </div>
+        `;
+
+         
+        }
+        // -----------------------------------------------------------------------
 
         listItem.innerHTML = `
             <div class="d-flex justify-content-between align-items-start gap-3">
@@ -1193,10 +1149,10 @@ function renderCombinedLog(logConsumed, logExpended) {
                         <span class="meal-time ms-2">${time}</span>
                     </div>
                     <div class="meal-description">${item.descripcion}</div>
-                </div>
+                    ${macrosHTML} </div>
                 <div class="d-flex flex-column align-items-end gap-2">
                     <span class="badge calorie-badge ${badgeClass}">
-                        ${sign}${item.kcal} Kcal
+                        ${sign}${Math.round(item.kcal)} Kcal
                     </span>
                     ${deleteButtonHTML}
                 </div>
@@ -1206,10 +1162,8 @@ function renderCombinedLog(logConsumed, logExpended) {
     });
 }
 
-// --- Eliminación de Items ---
-
 async function deleteLogItem(type, itemId, kcalValue) {
-    if (!userId || !db || selectedDay !== todayISO) {
+    if (!userId || !db /*|| selectedDay !== todayISO*/) {
         elements.coachMessage.textContent = "❌ Solo puedes eliminar registros de hoy.";
         return;
     }
@@ -1276,12 +1230,12 @@ function showLogDetails(type) {
             const sign = isConsumption ? '+' : '-';
             const badgeClass = isConsumption ? 'bg-success' : 'bg-danger';
             
-            const deleteButton = canDelete ? `
+            const deleteButton =  `
                 <button type="button" class="delete-btn" 
                     onclick="window.deleteLogItem('${type}', '${item.id}', ${item.kcal}); elements.logDetailsModal.hide();">
                     <i class="fas fa-trash"></i>
                 </button>
-            ` : '';
+            ` ;
 
             const listItem = document.createElement('div');
             listItem.className = 'log-item-card';
@@ -1670,12 +1624,17 @@ function renderTargetProgress(metas) {
         elements.grasasProgress.textContent = formatGoal(metas.grasas.actual, metas.grasas.meta);
     }
 
-    // 4. Actualizar Kcal (Total Consumido vs. Total Objetivo)
+    // 4. Fibra
+    if (elements.fibraProgress) {
+        elements.fibraProgress.textContent = formatGoal(metas.fibra.actual, metas.fibra.meta);
+    }
+
+    // 5. Actualizar Kcal (Total Consumido vs. Total Objetivo)
     if (elements.kcalTargetProgress) {
         elements.kcalTargetProgress.textContent = formatKcalGoal(metas.kcal.actual, metas.kcal.meta);
     }
     
-    // 5. Feedback Visual (Kcal Restante/Excedente)
+    // 6. Feedback Visual (Kcal Restante/Excedente)
     if (elements.kcalRestanteDisplay) {
         let texto;
         if (metas.kcal.restante > 0) {
@@ -1719,12 +1678,16 @@ function calcularMetasDiarias(perfil, macrosConsumidas, caloriasConsumidas) {
     const objetivoCarbos = Math.round((objetivoKcal * carbosPorcentaje) / 4); // (Kcal * %) / 4 Kcal/g
     const objetivoGrasas = Math.round((objetivoKcal * grasasPorcentaje) / 9); // (Kcal * %) / 9 Kcal/g
 
+    // NUEVA ADICIÓN: Meta de Fibra (25 gramos es el estándar mínimo recomendado)
+    const objetivoFibra = 25;
+
     // --- 2. Calcular el Progreso ---
     const progreso = {
         kcal: { meta: objetivoKcal, actual: caloriasConsumidas, restante: objetivoKcal - caloriasConsumidas },
         proteina: { meta: objetivoProteina, actual: macrosConsumidas.proteinas_dia, restante: objetivoProteina - macrosConsumidas.proteinas_dia },
         carbohidratos: { meta: objetivoCarbos, actual: macrosConsumidas.carbohidratos_dia, restante: objetivoCarbos - macrosConsumidas.carbohidratos_dia },
         grasas: { meta: objetivoGrasas, actual: macrosConsumidas.grasas_dia, restante: objetivoGrasas - macrosConsumidas.grasas_dia },
+        fibra: { meta: objetivoFibra, actual: macrosConsumidas.fibra_dia, restante: objetivoFibra - macrosConsumidas.fibra_dia },
         
         // Indicador de Ultraprocesados (la meta es 0 Kcal)
         ultraprocesados: { meta: 0, actual: macrosConsumidas.ultraprocesados_dia },
