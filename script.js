@@ -14,17 +14,82 @@ import { getFirestore,
     limit // Añadimos limit para la optimización
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// --- Importar configuraciones personales del archivo config.js ---
-import { FIREBASE_CONFIG_PERSONAL, GEMINI_API_KEY_PERSONAL, APP_PROJECT_ID } from './config.js';
+import { 
+    FIREBASE_CONFIG_PERSONAL,
+    GEMINI_API_KEYS,  // Cambia esto
+    RATE_LIMIT_CONFIG, // Añade esto
+    APP_PROJECT_ID 
+} from './config.js';
+
 // ==============================================================================
-// === VARIABLES GLOBALES Y CONFIGURACIÓN DINÁMICA ===
+// === SISTEMA DE GESTIÓN DE API KEYS ===
+// ==============================================================================
+
+class ApiKeyManager {
+    constructor(apiKeys, config = {}) {
+        this.apiKeys = apiKeys;
+        this.currentIndex = 0;
+        this.failedKeys = new Set();
+        this.requestCount = 0;
+        this.config = {
+            requestsPerKey: config.requestsPerKey || 20,
+            cooldownTime: config.cooldownTime || 60000,
+            ...config
+        };
+    }
+
+    getCurrentKey() {
+        return this.apiKeys[this.currentIndex];
+    }
+
+    rotateKey() {
+        this.requestCount = 0;
+        this.currentIndex = (this.currentIndex + 1) % this.apiKeys.length;
+        
+        // Si hemos rotado todas las keys y todas están fallando
+        if (this.failedKeys.size === this.apiKeys.length) {
+            console.warn('Todas las API keys han fallado. Esperando cooldown...');
+            setTimeout(() => {
+                this.failedKeys.clear();
+                console.log('Reiniciando sistema de API keys');
+            }, this.config.cooldownTime);
+        }
+    }
+
+    markKeyFailed(key) {
+        this.failedKeys.add(key);
+        this.rotateKey();
+    }
+
+    incrementRequest() {
+        this.requestCount++;
+        if (this.requestCount >= this.config.requestsPerKey) {
+            console.log(`Rotando API key después de ${this.requestCount} solicitudes`);
+            this.rotateKey();
+        }
+    }
+
+    getAvailableKeys() {
+        return this.apiKeys.filter(key => !this.failedKeys.has(key));
+    }
+}
+
+// ==============================================================================
+// === INICIALIZACIÓN ===
 // ==============================================================================
 
 const isCanvasEnvironment = typeof __firebase_config !== 'undefined';
 const firebaseConfig = isCanvasEnvironment ? JSON.parse(__firebase_config) : FIREBASE_CONFIG_PERSONAL;
 const initialAuthToken = isCanvasEnvironment ? __initial_auth_token : null;
-const API_KEY = isCanvasEnvironment ? "" : GEMINI_API_KEY_PERSONAL;
 const appId = isCanvasEnvironment ? __app_id : APP_PROJECT_ID;
+
+// Inicializar el gestor de API keys
+let API_KEY;
+if (!isCanvasEnvironment && GEMINI_API_KEYS.length > 0) {
+    API_KEY = new ApiKeyManager(GEMINI_API_KEYS, RATE_LIMIT_CONFIG);
+} else {
+    API_KEY = null; // En Canvas usaremos otra lógica
+}
 
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
 
@@ -72,7 +137,7 @@ const perfilUsuario = {
         peso_objetivo: 72,
         nivel_actividad: 'moderado', // sedentario, ligero, moderado, activo, muy_activo // quitar
         objetivo: 'definición', // perder_peso, mantener, ganar_musculo
-        ritmo_semanal: 0.5, // kg por semana
+        ritmo_semanal: 0.5, // kg por semana a bajar
 
         // Calculados automáticamente:
         tmb: 1718,
@@ -186,6 +251,31 @@ const perfilUsuario = {
         }
     },
    // futuros usuarios
+   sofia:  {
+        edad: 25,
+        sexo: 'femenino',
+        peso_actual: 59, // kg
+        altura: 160, // cm
+        peso_objetivo: 56,
+        nivel_actividad: 'moderado', // sedentario, ligero, moderado, activo, muy_activo // quitar
+        objetivo: 'definición', // perder_peso, mantener, ganar_musculo
+        ritmo_semanal: 0.4, // kg por semana a bajar
+
+        // Calculados automáticamente:
+        tmb: 1304, // Fórmula Mifflin-St Jeor (Mujeres)
+        tdee: 2021, // 1304 * 1.55
+        calorias_objetivo: 1621, // TDEE - 400 (para perder 0.4kg/semana)
+        fecha_actualizacion: '2025-12-06',
+
+        // RANGOS OBJETIVO DE MACROS (en gramos y porcentajes ajustados a 2345 kcal):
+       // RANGOS OBJETIVO DE MACROS (en gramos y porcentajes):
+        proteina_min: 94, // 59 kg * 1.6 g/kg
+        proteina_max: 130, // 59 kg * 2.2 g/kg
+
+        // NUEVA ADICIÓN: Rangos objetivo de macros para guiar la distribución (en %)
+        carbos_rango_porcentaje: '40-55%', 
+        grasas_rango_porcentaje: '20-30%',
+   }
 };
 
 let activePersonId = PEOPLE[0].id;
@@ -228,6 +318,7 @@ const elements = {
     netBalance: document.getElementById('netBalance'),
     balanceNetoBox: document.getElementById('balanceNetoBox'),
     coachMessage: document.getElementById('coachMessage'),
+    coachButton: document.getElementById('coachButton'),
     foodLog: document.getElementById('foodLog'),
     emptyLogMessage: document.getElementById('emptyLogMessage'),
     emptyLogUser: document.getElementById('emptyLogUser'),
@@ -479,6 +570,12 @@ function setupRealtimeListener() {
 function updateActiveUserUI() {
     elements.activeUserName.textContent = activePersonName;
     elements.emptyLogUser.textContent = activePersonName;
+    console.log(activePersonName)
+    if (activePersonName === 'Valentín') {
+        elements.activeUserName.classList.add('text-dark');
+    } else if (activePersonName === 'Sofía') {
+        elements.activeUserName.classList.add('text-danger');
+    }
 }
 
 function updateWeekSummaryUI() {
@@ -511,6 +608,10 @@ async function fetchGeminiCoachMessage(systemPrompt, userQuery) {
         contents: [{ parts: [{ text: userQuery }] }],
         systemInstruction: { parts: [{ text: systemPrompt }] },
         generationConfig: {
+            temperature: 0.7,  // Para balance estructura/creatividad
+            topP: 0.95,
+            topK: 40,
+            maxOutputTokens: 1500,  // Suficiente para 6 ítems
             responseMimeType: "application/json",
             responseSchema: {
                 type: "OBJECT",
@@ -597,25 +698,7 @@ function sanitizeHTML(html) {
     return temp.innerHTML;
 }
 
-function calcularMacrosDia_OLD(log_consumido) {
-    let prote = 0, carbs = 0, grasas = 0, fibra = 0, ultraprocesados = 0;
 
-    log_consumido.forEach(item => {
-        prote += item.proteinas || 0;
-        carbs += item.carbohidratos || 0;
-        grasas += item.grasas || 0;
-        fibra += item.fibra || 0;
-        if (item.procesado === 'ultraprocesado') ultraprocesados++;
-    });
-
-    return {
-        proteinas_dia: prote,
-        carbohidratos_dia: carbs,
-        grasas_dia: grasas,
-        fibra_dia: fibra,
-        ultraprocesados_dia: ultraprocesados
-    };
-}
 /**
  * Calcula la suma total de macronutrientes y las Kcal de ultraprocesados para el día.
  * @param {Array<Object>} log_consumido - El log de comidas consumidas.
@@ -726,6 +809,183 @@ async function obtenerUltimoAnalisis(userId, dayISO) {
     
     return "";
 }
+// /**
+//  * Genera el mensaje personalizado del coach nutricional basándose en el estado del día.
+//  * @param {number} consumido - Kcal totales consumidas.
+//  * @param {number} gastado - Kcal gastadas por ejercicio.
+//  * @param {Object} perfilUsuario - Objeto con el perfil y metas del usuario.
+//  * @param {string} momentOfDay - Indica el momento del análisis ('desayuno', 'almuerzo', 'merienda/entreno', 'final').
+//  * @param {string} [contextoPrevio=''] - Mensaje del análisis anterior para seguimiento (para el ítem 10).
+//  * @returns {Promise<string>} Mensaje del coach.
+//  */
+// async function generarMensajeCoach(consumido, gastado, perfilUsuario, momentOfDay, contextoPrevio = "") {
+//     const balance = consumido - gastado;
+//     const deficit_esperado = perfilUsuario.tdee - perfilUsuario.calorias_objetivo;
+//     const deficit_real = perfilUsuario.tdee - balance;
+
+//     const data = weekData[selectedDay] || {
+//         consumido: 0,
+//         gastado: 0,
+//         log_consumido: [],
+//         log_gastado: []
+//     };
+    
+//     currentLogData = data;
+
+//     const { 
+//         proteinas_dia, 
+//         carbohidratos_dia, 
+//         grasas_dia, 
+//         fibra_dia, 
+//         ultraprocesados_dia 
+//     } = calcularMacrosDia(currentLogData.log_consumido);
+
+//     // --- Lógica del Prompt Dinámico ---
+//     let analysisInstructions = "";
+//     let analysisTone = "";
+//     const metasKcal = perfilUsuario.calorias_objetivo;
+
+//     // 11. Tono y enfoque basado en el momento del día
+//     switch (momentOfDay) {
+//         case 'Desayuno':
+//             analysisTone = "Tono: Proactivo y optimista. Enfócate en el combustible para la mañana. El análisis es 'Parcial'.";
+//             analysisInstructions = `
+//                 1. Evalúa el aporte de <strong>Proteínas</strong> y <strong>Fibra</strong> del desayuno en relación a la meta de saciedad del día.
+//                 2. Sugiere la estrategia de ingesta para las próximas horas (media mañana o almuerzo), enfocándose en mantener el <strong>déficit bajo control</strong>.
+//                 3. Proporciona una recomendación de hidratación y manejo de ansiedad para la mañana.
+//                 4. **Corrección Urgente:** Si el desayuno es muy bajo en proteínas (menos de 20g), sugiere una adición inmediata.
+//             `;
+//             break;
+            
+//         case 'Almuerzo':
+//             analysisTone = "Tono: Control de mitad de jornada. Evalúa el cumplimiento calórico y de macros de la mañana. El análisis es 'Parcial'.";
+//             analysisInstructions = `
+//                 1. Evalúa el porcentaje de <strong>macros</strong> y calorías consumidas hasta el mediodía (debe ser aproximadamente el 40-50% de la meta total de ${metasKcal} Kcal).
+//                 2. Si hay un gran desvío, sugiere una <strong>corrección estratégica</strong> en la merienda/cena.
+//                 3. **Análisis Profunda:** Evalúa la calidad nutricional del almuerzo, usando las preferencias alimentarias del usuario para sugerir opciones de snacks o correcciones de la tarde.
+//                 4. Si el usuario entrena por la tarde (${perfilUsuario.fitness.horario_entrenamiento}), establece la estrategia nutricional Pre-entrenamiento (Carbohidratos 40-60 mins antes).
+//             `;
+//             break;
+            
+//         case 'Merienda':
+//             analysisTone = "Tono: Estratégico y de recuperación. Enfócate en la ventana pre/post-entrenamiento. El análisis es 'Parcial'.";
+//             analysisInstructions = `
+//                 1. Evalúa la adecuación del <strong>timing nutricional</strong> pre-entrenamiento. ¿Hubo suficientes carbohidratos de fácil digestión para el entrenamiento de ${perfilUsuario.fitness.tipo_entrenamiento}?
+//                 2. Proporciona una estrategia de recuperación <strong>Post-entrenamiento</strong> (Proteína + Carbohidratos) para la cena.
+//                 3. **Déficit Inminente:** Si el déficit calórico es muy alto antes de la cena, advierte el riesgo de comer en exceso y sugiere un ajuste en la cena.
+//                 4. Evalúa la ingesta de <strong>Proteínas totales</strong> y la necesidad de un aporte proteico significativo en la cena para alcanzar la meta.
+//             `;
+//             break;
+            
+//         case 'Cena':
+//         default:
+//             analysisTone = "Tono: Retrospectivo, enfocado en la sostenibilidad, la recuperación y la planificación del día siguiente. El análisis es 'Final'.";
+//             analysisInstructions = `
+//                 1. Evalúa el cumplimiento final del <strong>objetivo calórico</strong> y de <strong>Proteínas totales</strong> del día.
+//                 2. **Evaluación Profunda:** Analiza la distribución final de macros, la ingesta de <strong>Fibra</strong> (${fibra_dia} g) y la calidad nutricional (cantidad de <strong>Ultraprocesados</strong>).
+//                 3. Proporciona una recomendación clave para la <strong>planificación y descanso</strong> del día siguiente, en relación a su nivel de estrés (${perfilUsuario.salud_y_sostenibilidad.nivel_estres_dia}/10) y hora de sueño.
+//                 4. Sugiere un plato o ingrediente de la lista de favoritos que hubiera ayudado a mejorar la composición del día.
+//             `;
+//             break;
+//     }
+    
+//     // 10. Punto de control si hay feedback previo
+//     const contextItem = contextoPrevio ? `
+//         1. PUNTO DE CONTROL: ¿Se implementaron las sugerencias o correcciones dadas en el análisis anterior?
+//         CONTEXTO PREVIO: ${contextoPrevio}
+//     ` : '';
+
+//     // --- Definición del System Prompt (Sigue siendo la base) ---
+//     const systemPrompt = `Actúa como un nutricionista y coach personal profesional, especializado en nutrición basada en evidencia, guías internacionales (EFSA, FDA, ISSN) y el enfoque práctico del nutricionista Francis Holway.
+// Tu prioridad es generar recomendaciones científicamente válidas y personalizadas, evitando mitos, exageraciones y cualquier afirmación sin respaldo empírico.
+
+// PERFIL DEL USUARIO:
+// - Nombre: ${activePersonName}
+// - Objetivo calórico: ${perfilUsuario.calorias_objetivo} kcal/día | Meta: ${perfilUsuario.objetivo} a ${perfilUsuario.ritmo_semanal} kg/semana
+// - Rango Proteína Objetivo: ${perfilUsuario.proteina_min}g - ${perfilUsuario.proteina_max}g
+// - Rango Carbos Objetivo: ${perfilUsuario.carbos_rango_porcentaje} | Rango Grasas Objetivo: ${perfilUsuario.grasas_rango_porcentaje}
+// - Tiempo libre cocina: ${perfilUsuario.salud_y_sostenibilidad.tiempo_libre_cocina_semanal}
+// - Entrenamiento: ${perfilUsuario.fitness.tipo_entrenamiento} - ${perfilUsuario.fitness.horario_entrenamiento}
+
+// DATOS DEL DÍA (hasta ahora):
+// - Calorías consumidas: ${consumido} kcal
+// - Calorías gastadas (ejercicio): ${gastado} kcal
+// - Calorías Netas (Consumo - Gasto Ejercicio): ${balance} kcal
+// - **Déficit Real (vs TDEE): ${deficit_real} kcal** - Déficit esperado: ${deficit_esperado} kcal
+
+// MACRONUTRIENTES Y CALIDAD:
+// - Proteínas ingeridas: ${proteinas_dia} g
+// - Carbohidratos ingeridos: ${carbohidratos_dia} g
+// - Grasas ingeridas: ${grasas_dia} g
+// - Fibra ingerida: ${fibra_dia} g
+// - Alimentos ultraprocesados: ${ultraprocesados_dia}
+// - Preferencias Alimentarias Favoritas: ${Object.values(perfilUsuario.preferencias_alimentarias).flat().join(', ')}
+
+// REGLAS DE RESPUESTA (muy importantes):
+// - Utiliza únicamente afirmaciones consistentes con evidencia científica.
+// - No inventes datos fisiológicos ni valores nutricionales.
+// - Sé preciso, directo y orientado a decisiones accionables.
+// - Evita lenguaje alarmista; prioriza la claridad y la adherencia.
+// - Mantén un tono profesional, motivador y equilibrado.`;
+
+//     // --- Definición del User Query (Instrucciones) ---
+//     const userQuery = `ANÁLISIS NUTRICIONAL - ${momentOfDay.toUpperCase()}
+// ## FORMATO OBLIGATORIO (NO NEGOCIABLE):
+// - Debes responder con EXACTAMENTE 6 ítems numerados (1. a 6.)
+// - Cada ítem debe tener entre 2 y 4 oraciones
+// - Usa 1 emoji relevante al inicio de cada ítem
+// - Destaca métricas importantes con **negritas** (NO uses <strong>)
+// - Separa cada ítem numerado con un salto de línea HTML.
+//     
+// ## TEMAS DE LOS 6 ÍTEMS (OBLIGATORIOS):
+//         
+// <1. 🟢 **Evaluación Calórica y Adherencia:** Evalúa el Déficit Real (${deficit_real} kcal) comparado con el Déficit Esperado (${deficit_esperado} kcal).
+// 2. 💪 **Revisión de Proteínas:** Evalúa si ${proteinas_dia} g están dentro del rango objetivo (${perfilUsuario.proteina_min}g - ${perfilUsuario.proteina_max}g) y su impacto en la <strong>Definición</strong>.
+// 3. ⏱️ **Timing Nutricional (Pre/Post-Entreno):** Analiza la distribución de carbohidratos alrededor del horario de entrenamiento (${perfilUsuario.fitness.horario_entrenamiento}) y cómo afecta el rendimiento (Si es que ese dia entrenó, si no evalualo desde otra mirada).
+// 4. 🥕 **Fibra y Calidad Nutricional:** Evalúa la ingesta de <strong>Fibra</strong> (${fibra_dia} g) y la cantidad de <strong>Ultraprocesados</strong>, ofreciendo consejos de saciedad.
+// 5. 🧭 **Ajuste Prioritario y Recomendación:** Sugiere la corrección más urgente para el día siguiente o la recomendación más importante. Menciona un plato o ingrediente de las preferencias alimentarias (${Object.values(perfilUsuario.preferencias_alimentarias).flat().join(', ').substring(0, 100)}...) que lo facilite.
+// 6. 💤 **Recuperación y Planificación:** Conecta la nutrición con el nivel de estrés (${perfilUsuario.salud_y_sostenibilidad.nivel_estres_dia}/10) y la <strong>planificación de la cena</strong> o el desayuno de mañana.
+
+// ## ENFOQUE ESPECÍFICO PARA ${momentOfDay}:
+// ${analysisInstructions}
+
+// ${contextItem ? `## CONTEXTO PREVIO:
+// Considera si se implementó: "${contextoPrevio}"` : ''}
+
+// ## TONO:
+// ${analysisTone}
+
+// `;
+//     console.log(systemPrompt)
+//     console.log(userQuery)
+
+//     let intentos = 0;
+//     let mensaje = "";
+    
+//     while (intentos < 3) {
+//         mensaje = await fetchGeminiCoachMessage(systemPrompt, userQuery);
+        
+//         // Validar que la respuesta tenga al menos 6 ítems
+//         const itemCount = (mensaje.match(/\d\.\s/g) || []).length;
+//         const lineas = mensaje.split('\n').filter(l => l.trim().length > 0);
+        
+//         if (itemCount >= 6 && lineas.length >= 8) {
+//             return mensaje;
+//         }
+        
+//         // Si es corto, regenerar con instrucciones más claras
+//         intentos++;
+        
+//         if (intentos < 3) {
+//             userQuery += "\n\n⚠️ IMPORTANTE: Tu respuesta anterior fue muy corta. Asegúrate de generar EXACTAMENTE 6 ítems numerados, cada uno con 2-4 oraciones completas.";
+//         }
+//     }
+
+//     const macros = calcularMacrosDia(data.log_consumido);
+//     return generarMensajeFallback(consumido, gastado, perfilUsuario, momentOfDay, macros);
+// }
+
+
 /**
  * Genera el mensaje personalizado del coach nutricional basándose en el estado del día.
  * @param {number} consumido - Kcal totales consumidas.
@@ -759,124 +1019,534 @@ async function generarMensajeCoach(consumido, gastado, perfilUsuario, momentOfDa
 
     // --- Lógica del Prompt Dinámico ---
     let analysisInstructions = "";
-    let analysisTone = "";
+    let analysisTone = "Profesional y amigable";
     const metasKcal = perfilUsuario.calorias_objetivo;
 
-    // 11. Tono y enfoque basado en el momento del día
-    switch (momentOfDay) {
+// --- System Prompt Optimizado y Corregido ---
+const systemPrompt = `Eres nutricionista deportivo especializado, usando el enfoque científico-práctico.
+ANÁLISIS: Basado EN LOS DATOS PROPORCIONADOS, NO asumas ni inventes datos.
+REFERENCIAS: Usa las referencias proporcionadas cuando apliquen.
+
+FORMATO DE RESPUESTA OBLIGATORIO:
+• Exactamente 6 puntos numerados (1. 2. 3. 4. 5. 6.)
+• Cada punto: 4-5 oraciones completas
+• Emoji al inicio de cada punto
+• Números importantes en **negritas**
+• Separación entre puntos con un salto de linea o un <hr>
+• No incluir encabezados adicionales
+
+DATOS DEL SISTEMA (solo para contexto):
+• Atleta: ${activePersonName}
+• TDEE: ${perfilUsuario.tdee} kcal | Objetivo: ${perfilUsuario.calorias_objetivo} kcal
+• Déficit esperado: ${deficit_esperado} kcal (${(deficit_esperado/perfilUsuario.tdee*100).toFixed(1)}%)
+• Peso: ${perfilUsuario.peso_actual} kg
+• Entrenamiento: ${perfilUsuario.fitness.tipo_entrenamiento} a las ${perfilUsuario.fitness.horario_entrenamiento}
+
+Tu rol: Analizar los datos específicos del día y dar recomendaciones prácticas.`;
+const alimentosConsumidos = currentLogData.log_consumido.map(item => item.nombre).filter(Boolean);
+const alimentosStr = alimentosConsumidos.length > 0 
+    ? alimentosConsumidos.slice(0, 8).join(', ') + (alimentosConsumidos.length > 8 ? '...' : '')
+    : 'No hay registro de alimentos';
+
+
+    
+// --- User Query Optimizado ---
+let userQuery = `DATOS ACTUALES PARA ANÁLISIS (${momentOfDay.toUpperCase()}):
+
+• Calorías consumidas: ${consumido} kcal
+• Calorías ejercicio: ${gastado} kcal
+• Balance neto: ${balance} kcal
+• Déficit real: ${deficit_real} kcal (vs objetivo: ${deficit_esperado} kcal)
+• Proteína: ${proteinas_dia}g (${(proteinas_dia/perfilUsuario.peso_actual).toFixed(1)}g/kg)
+• Objetivo proteína: ${(perfilUsuario.proteina_min/perfilUsuario.peso_actual).toFixed(1)}-${(perfilUsuario.proteina_max/perfilUsuario.peso_actual).toFixed(1)}g/kg
+• Carbohidratos: ${carbohidratos_dia}g
+• Fibra: ${fibra_dia}g (meta: ${(consumido/1000*14).toFixed(1)}g)
+• Ultraprocesados: ${ultraprocesados_dia} kcal (${consumido>0 ? (ultraprocesados_dia/consumido*100).toFixed(1) : 0}%)
+• Estrés: ${perfilUsuario.salud_y_sostenibilidad.nivel_estres_dia}/10
+• Sueño: ${perfilUsuario.salud_y_sostenibilidad.hora_habitual_dormir}
+• Preferencia proteica: ${perfilUsuario.preferencias_alimentarias.proteinas_favoritas[0] || "huevo"}
+• Tiempo disponible: ${perfilUsuario.salud_y_sostenibilidad.tiempo_libre_cocina_semanal}
+
+GENERA ANÁLISIS CON 6 PUNTOS:
+
+1. 🟢 EVALUACIÓN DEL BALANCE ENERGÉTICO
+Analiza específicamente el déficit real de **${deficit_real} kcal** vs el objetivo de **${deficit_esperado} kcal**. ¿Es sostenible para ${perfilUsuario.ritmo_semanal} kg/semana?
+
+2. 💪 ANÁLISIS DE PROTEÍNA
+Evalúa **${(proteinas_dia/perfilUsuario.peso_actual).toFixed(1)}g/kg** vs objetivo **${(perfilUsuario.proteina_min/perfilUsuario.peso_actual).toFixed(1)}-${(perfilUsuario.proteina_max/perfilUsuario.peso_actual).toFixed(1)}g/kg**. Impacto en definición muscular.
+
+3. ⏱️ DISTRIBUCIÓN Y TIMING NUTRICIONAL
+Entreno: ${perfilUsuario.fitness.horario_entrenamiento}. Analiza **${carbohidratos_dia}g de carbohidratos** en relación al timing. Recomendación basada en evidencia ISSN.
+
+4. 🥕 CALIDAD NUTRICIONAL Y FIBRA
+Fibra: **${fibra_dia}g** (meta ${(consumido/1000*14).toFixed(1)}g). Ultraprocesados: **${ultraprocesados_dia} kcal**. Estrategias para densidad nutricional.
+
+5. 🧭 CORRECCIÓN PRIORITARIA PARA MAÑANA
+Análisis de alimentos consumidos hoy: ${alimentosStr}.
+¿Brecha principal? (proteína/energía/distribución/calidad). 
+Sugiere ajuste específico usando ${perfilUsuario.preferencias_alimentarias.proteinas_favoritas.join(', ')}.
+Enfoque práctico para ${perfilUsuario.salud_y_sostenibilidad.tiempo_libre_cocina_semanal} considerando las preferencias: ${perfilUsuario.preferencias_alimentarias.opciones_rapidas_faciles.slice(0, 3).join(', ')}.
+6. 💤 RECUPERACIÓN Y PLANIFICACIÓN
+Estrés: **${perfilUsuario.salud_y_sostenibilidad.nivel_estres_dia}/10**. Recomendaciones para sueño (${perfilUsuario.salud_y_sostenibilidad.hora_habitual_dormir}) e hidratación. Plan para ${momentOfDay === 'Cena' ? 'desayuno' : 'próxima comida'}.
+
+TONO: Profesional y amigable.
+USAR REFERENCIAS SI APLICAN:
+• Morton et al. 2018 para proteína (1.6-2.2g/kg)
+• Garthe et al. 2011 para déficit (0.7%/semana)
+• Aragon & Schoenfeld 2013 para timing
+• Slavin 2013 para fibra-saciedad`;
+
+// ${contextoPrevio ? `## SEGUIMIENTO DEL ANÁLISIS ANTERIOR:
+// Contexto previo: "${contextoPrevio.substring(0, 120)}"` : ''}
+    console.log(systemPrompt)
+    console.log(userQuery)
+
+    let intentos = 0;
+    let mensaje = "";
+    
+    while (intentos < 3) {
+        mensaje = await fetchGeminiCoachMessage(systemPrompt, userQuery);
+        
+        // Validar que la respuesta tenga al menos 6 ítems
+        const itemCount = (mensaje.match(/\d\.\s/g) || []).length;
+        const lineas = mensaje.split('\n').filter(l => l.trim().length > 0);
+        
+        if (itemCount >= 6 && lineas.length >= 8) {
+            return mensaje;
+        }
+        
+        // Si es corto, regenerar con instrucciones más claras
+        intentos++;
+        
+        if (intentos < 3) {
+            userQuery += "\n\n⚠️ IMPORTANTE: Tu respuesta anterior fue muy corta. Asegúrate de generar EXACTAMENTE 6 ítems numerados, cada uno con 2-4 oraciones completas.";
+        }
+    }
+
+    const macros = calcularMacrosDia(data.log_consumido);
+    return generarMensajeFallback(consumido, gastado, perfilUsuario, momentOfDay, macros);
+}
+
+/**
+ * Genera un mensaje de fallback estructurado cuando Gemini no responde adecuadamente
+ * @param {number} consumido - Kcal totales consumidas.
+ * @param {number} gastado - Kcal gastadas por ejercicio.
+ * @param {Object} perfilUsuario - Objeto con el perfil y metas del usuario.
+ * @param {string} momentOfDay - Indica el momento del análisis.
+ * @param {Object} macros - Objeto con los macros calculados del día.
+ * @returns {string} Mensaje del coach estructurado.
+ */
+function generarMensajeFallback(consumido, gastado, perfilUsuario, momentOfDay, macros) {
+    const {
+        proteinas_dia,
+        carbohidratos_dia,
+        grasas_dia,
+        fibra_dia,
+        ultraprocesados_dia
+    } = macros || calcularMacrosDia([]); // Usa macros proporcionados o calcula vacío
+    
+    const balance = consumido - gastado;
+    const deficit_esperado = perfilUsuario.tdee - perfilUsuario.calorias_objetivo;
+    const deficit_real = perfilUsuario.tdee - balance;
+    
+    // Calcular porcentajes de macros
+    const kcalProteinas = proteinas_dia * 4;
+    const kcalCarbos = carbohidratos_dia * 4;
+    const kcalGrasas = grasas_dia * 9;
+    const totalMacrosKcal = kcalProteinas + kcalCarbos + kcalGrasas;
+    
+    const porcentajeProteinas = totalMacrosKcal > 0 ? (kcalProteinas / totalMacrosKcal * 100).toFixed(1) : "0";
+    const porcentajeCarbos = totalMacrosKcal > 0 ? (kcalCarbos / totalMacrosKcal * 100).toFixed(1) : "0";
+    const porcentajeGrasas = totalMacrosKcal > 0 ? (kcalGrasas / totalMacrosKcal * 100).toFixed(1) : "0";
+    
+    // Determinar estado calórico
+    let evaluacionCalorica = "";
+    let emojiCalorias = "🟡";
+    
+    if (deficit_real > deficit_esperado * 1.2) {
+        evaluacionCalorica = `Déficit alto (${deficit_real} vs ${deficit_esperado} kcal esperado). Considera ajustar la ingesta.`;
+        emojiCalorias = "🔴";
+    } else if (deficit_real >= deficit_esperado * 0.8) {
+        evaluacionCalorica = `Déficit en rango objetivo (${deficit_real} kcal). Buen progreso hacia ${perfilUsuario.ritmo_semanal} kg/semana.`;
+        emojiCalorias = "🟢";
+    } else if (deficit_real > 0) {
+        evaluacionCalorica = `Déficit menor al objetivo. Revisa la distribución del resto del día.`;
+        emojiCalorias = "🟡";
+    } else {
+        evaluacionCalorica = `Superávit calórico. Ajusta las próximas comidas para volver al déficit.`;
+        emojiCalorias = "🔴";
+    }
+    
+    // Determinar estado de proteínas
+    let evaluacionProteinas = "";
+    let emojiProteinas = "💪";
+    
+    if (proteinas_dia < perfilUsuario.proteina_min * 0.8) {
+        evaluacionProteinas = `Proteínas bajas (${proteinas_dia}g). Necesitas al menos ${perfilUsuario.proteina_min}g para preservar músculo.`;
+        emojiProteinas = "🔴";
+    } else if (proteinas_dia < perfilUsuario.proteina_min) {
+        evaluacionProteinas = `Proteínas cercanas al mínimo (${proteinas_dia}g). Añade más en la próxima comida.`;
+        emojiProteinas = "🟡";
+    } else if (proteinas_dia <= perfilUsuario.proteina_max) {
+        evaluacionProteinas = `Proteínas en rango óptimo (${proteinas_dia}g). Ideal para definición muscular.`;
+        emojiProteinas = "🟢";
+    } else {
+        evaluacionProteinas = `Proteínas altas (${proteinas_dia}g). Dentro de límites seguros pero podría redistribuirse.`;
+        emojiProteinas = "🟡";
+    }
+    
+    // Evaluar fibra
+    let evaluacionFibra = "";
+    const metaFibra = perfilUsuario.sexo === 'femenino' ? 25 : 38; // Metas generales AHA
+    
+    if (fibra_dia < metaFibra * 0.5) {
+        evaluacionFibra = `Fibra muy baja (${fibra_dia}g). Aumenta vegetales y granos integrales para saciedad.`;
+    } else if (fibra_dia < metaFibra) {
+        evaluacionFibra = `Fibra moderada (${fibra_dia}g). Podrías mejorar con más vegetales.`;
+    } else {
+        evaluacionFibra = `Fibra adecuada (${fibra_dia}g). Excelente para salud digestiva y saciedad.`;
+    }
+    
+    // Evaluar ultraprocesados
+    let evaluacionProcesados = "";
+    const porcentajeProcesados = consumido > 0 ? ((ultraprocesados_dia / consumido) * 100).toFixed(1) : 0;
+    
+    if (porcentajeProcesados > 20) {
+        evaluacionProcesados = `Alto en ultraprocesados (${porcentajeProcesados}% del total). Reduce para mejor salud.`;
+    } else if (porcentajeProcesados > 10) {
+        evaluacionProcesados = `Moderado en ultraprocesados (${porcentajeProcesados}%). Mantén bajo control.`;
+    } else {
+        evaluacionProcesados = `Bajo en ultraprocesados (${porcentajeProcesados}%). Excelente elección de alimentos.`;
+    }
+    
+    // Mensaje según momento del día
+    let recomendacionMomento = "";
+    switch(momentOfDay) {
         case 'Desayuno':
-            analysisTone = "Tono: Proactivo y optimista. Enfócate en el combustible para la mañana. El análisis es 'Parcial'.";
-            analysisInstructions = `
-                1. Evalúa el aporte de <strong>Proteínas</strong> y <strong>Fibra</strong> del desayuno en relación a la meta de saciedad del día.
-                2. Sugiere la estrategia de ingesta para las próximas horas (media mañana o almuerzo), enfocándose en mantener el <strong>déficit bajo control</strong>.
-                3. Proporciona una recomendación de hidratación y manejo de ansiedad para la mañana.
-                4. **Corrección Urgente:** Si el desayuno es muy bajo en proteínas (menos de 20g), sugiere una adición inmediata.
-            `;
+            recomendacionMomento = "Enfócate en un desayuno alto en proteínas (>20g) y fibra para controlar el hambre matutina y mantener energía estable.";
             break;
-            
         case 'Almuerzo':
-            analysisTone = "Tono: Control de mitad de jornada. Evalúa el cumplimiento calórico y de macros de la mañana. El análisis es 'Parcial'.";
-            analysisInstructions = `
-                1. Evalúa el porcentaje de <strong>macros</strong> y calorías consumidas hasta el mediodía (debe ser aproximadamente el 40-50% de la meta total de ${metasKcal} Kcal).
-                2. Si hay un gran desvío, sugiere una <strong>corrección estratégica</strong> en la merienda/cena.
-                3. **Análisis Profunda:** Evalúa la calidad nutricional del almuerzo, usando las preferencias alimentarias del usuario para sugerir opciones de snacks o correcciones de la tarde.
-                4. Si el usuario entrena por la tarde (${perfilUsuario.fitness.horario_entrenamiento}), establece la estrategia nutricional Pre-entrenamiento (Carbohidratos 40-60 mins antes).
-            `;
+            recomendacionMomento = "Prioriza proteína magra, vegetales abundantes y carbohidratos complejos. Idealmente 30-40% de tus calorías diarias.";
             break;
-            
         case 'Merienda':
-            analysisTone = "Tono: Estratégico y de recuperación. Enfócate en la ventana pre/post-entrenamiento. El análisis es 'Parcial'.";
-            analysisInstructions = `
-                1. Evalúa la adecuación del <strong>timing nutricional</strong> pre-entrenamiento. ¿Hubo suficientes carbohidratos de fácil digestión para el entrenamiento de ${perfilUsuario.fitness.tipo_entrenamiento}?
-                2. Proporciona una estrategia de recuperación <strong>Post-entrenamiento</strong> (Proteína + Carbohidratos) para la cena.
-                3. **Déficit Inminente:** Si el déficit calórico es muy alto antes de la cena, advierte el riesgo de comer en exceso y sugiere un ajuste en la cena.
-                4. Evalúa la ingesta de <strong>Proteínas totales</strong> y la necesidad de un aporte proteico significativo en la cena para alcanzar la meta.
-            `;
+            recomendacionMomento = `Prepara un snack pre-entreno con carbohidratos de fácil digestión (fruta, avena) y algo de proteína ligera.`;
             break;
-            
         case 'Cena':
         default:
-            analysisTone = "Tono: Retrospectivo, enfocado en la sostenibilidad, la recuperación y la planificación del día siguiente. El análisis es 'Final'.";
-            analysisInstructions = `
-                1. Evalúa el cumplimiento final del <strong>objetivo calórico</strong> y de <strong>Proteínas totales</strong> del día.
-                2. **Evaluación Profunda:** Analiza la distribución final de macros, la ingesta de <strong>Fibra</strong> (${fibra_dia} g) y la calidad nutricional (cantidad de <strong>Ultraprocesados</strong>).
-                3. Proporciona una recomendación clave para la <strong>planificación y descanso</strong> del día siguiente, en relación a su nivel de estrés (${perfilUsuario.salud_y_sostenibilidad.nivel_estres_dia}/10) y hora de sueño.
-                4. Sugiere un plato o ingrediente de la lista de favoritos que hubiera ayudado a mejorar la composición del día.
-            `;
+            recomendacionMomento = "Cena ligera pero con proteína suficiente (30-40g) para recuperación nocturna y control del apetito matutino.";
             break;
     }
     
-    // 10. Punto de control si hay feedback previo
-    const contextItem = contextoPrevio ? `
-        1. PUNTO DE CONTROL: ¿Se implementaron las sugerencias o correcciones dadas en el análisis anterior?
-        CONTEXTO PREVIO: ${contextoPrevio}
-    ` : '';
+    // Obtener ingredientes favoritos
+    const todosIngredientes = Object.values(perfilUsuario.preferencias_alimentarias).flat();
+    const ingredienteAleatorio = todosIngredientes.length > 0 
+        ? todosIngredientes[Math.floor(Math.random() * todosIngredientes.length)]
+        : "alimentos que disfrutes";
+    
+    // Determinar recomendación basada en análisis
+    let recomendacionUrgente = "";
+    if (proteinas_dia < perfilUsuario.proteina_min * 0.7) {
+        recomendacionUrgente = `AUMENTA PROTEÍNAS: Incluye ${ingredienteAleatorio} u otra fuente proteica en la próxima comida.`;
+    } else if (porcentajeProcesados > 25) {
+        recomendacionUrgente = `REDUCE ULTRAPROCESADOS: Sustituye por opciones más naturales como ${ingredienteAleatorio}.`;
+    } else if (deficit_real > deficit_esperado * 1.5) {
+        recomendacionUrgente = `MODERA DÉFICIT: El déficit es muy agresivo. Considera una comida más sustanciosa.`;
+    } else {
+        recomendacionUrgente = `MANTÉN EL CURSO: Sigue con tu plan actual. Incluye ${ingredienteAleatorio} para variedad.`;
+    }
+    
+    // Construir el mensaje estructurado con 6 ítems
+    return `
+1. ${emojiCalorias} **Evaluación Calórica y Adherencia**
+${evaluacionCalorica} Balance: ${consumido} kcal consumidas - ${gastado} kcal gastadas = ${balance} kcal netas.
 
-    // --- Definición del System Prompt (Sigue siendo la base) ---
-    const systemPrompt = `Actúa como un nutricionista y coach personal profesional, especializado en nutrición basada en evidencia, guías internacionales (EFSA, FDA, ISSN) y el enfoque práctico del nutricionista Francis Holway.
-Tu prioridad es generar recomendaciones científicamente válidas y personalizadas, evitando mitos, exageraciones y cualquier afirmación sin respaldo empírico.
+2. ${emojiProteinas} **Revisión de Proteínas y Macronutrientes**
+${evaluacionProteinas} Distribución: ${porcentajeProteinas}% Proteína, ${porcentajeCarbos}% Carbos, ${porcentajeGrasas}% Grasas.
 
-PERFIL DEL USUARIO:
-- Nombre: ${activePersonName}
-- Objetivo calórico: ${perfilUsuario.calorias_objetivo} kcal/día | Meta: ${perfilUsuario.objetivo} a ${perfilUsuario.ritmo_semanal} kg/semana
-- Rango Proteína Objetivo: ${perfilUsuario.proteina_min}g - ${perfilUsuario.proteina_max}g
-- Rango Carbos Objetivo: ${perfilUsuario.carbos_rango_porcentaje} | Rango Grasas Objetivo: ${perfilUsuario.grasas_rango_porcentaje}
-- Tiempo libre cocina: ${perfilUsuario.salud_y_sostenibilidad.tiempo_libre_cocina_semanal}
-- Entrenamiento: ${perfilUsuario.fitness.tipo_entrenamiento} - ${perfilUsuario.fitness.horario_entrenamiento}
+3. ⏱️ **Timing Nutricional y Entrenamiento**
+${recomendacionMomento} Entrenas ${perfilUsuario.fitness.horario_entrenamiento.toLowerCase()} - tipo ${perfilUsuario.fitness.tipo_entrenamiento}.
 
-DATOS DEL DÍA (hasta ahora):
-- Calorías consumidas: ${consumido} kcal
-- Calorías gastadas (ejercicio): ${gastado} kcal
-- Calorías Netas (Consumo - Gasto Ejercicio): ${balance} kcal
-- **Déficit Real (vs TDEE): ${deficit_real} kcal** - Déficit esperado: ${deficit_esperado} kcal
+4. 🥕 **Calidad Nutricional y Fibra**
+${evaluacionFibra} ${evaluacionProcesados} Ultraprocesados: ${ultraprocesados_dia} kcal (${porcentajeProcesados}%).
 
-MACRONUTRIENTES Y CALIDAD:
-- Proteínas ingeridas: ${proteinas_dia} g
-- Carbohidratos ingeridos: ${carbohidratos_dia} g
-- Grasas ingeridas: ${grasas_dia} g
-- Fibra ingerida: ${fibra_dia} g
-- Alimentos ultraprocesados: ${ultraprocesados_dia}
-- Preferencias Alimentarias Favoritas: ${Object.values(perfilUsuario.preferencias_alimentarias).flat().join(', ')}
+5. 🧭 **Ajuste Prioritario y Recomendación**
+${recomendacionUrgente} Objetivo: ${perfilUsuario.objetivo} a ${perfilUsuario.ritmo_semanal} kg/semana.
 
-REGLAS DE RESPUESTA (muy importantes):
-- Utiliza únicamente afirmaciones consistentes con evidencia científica.
-- No inventes datos fisiológicos ni valores nutricionales.
-- Sé preciso, directo y orientado a decisiones accionables.
-- Evita lenguaje alarmista; prioriza la claridad y la adherencia.
-- Mantén un tono profesional, motivador y equilibrado.`;
-
-    // --- Definición del User Query (Instrucciones) ---
-    const userQuery = `DIRECTRICES DE FORMATO (¡PRIORIDAD MÁXIMA!):
-    1. La respuesta DEBE estar obligatoriamente en formato de ÍTEMS ENUMERADOS (1., 2., 3., 4., 5., 6.).
-    2. Debes generar **EXACTAMENTE 6 ítems**. Cada ítem debe tener un máximo de 4 oraciones.
-    3. Usa emojis relevantes, sin saturar, al inicio de cada ítem.
-    4. Usa la etiqueta <strong> para resaltar palabras clave, métricas o palabras importantes.
-    5. Finaliza la respuesta de cada ítem (son 6) con un salto de línea HTML.
-    
-    // ESTA ES LA LISTA OBLIGATORIA DE TEMAS PARA LOS 6 ÍTEMS:
-        
-        1. 🟢 **Evaluación Calórica y Adherencia:** Evalúa el Déficit Real (${deficit_real} kcal) comparado con el Déficit Esperado (${deficit_esperado} kcal).
-        2. 💪 **Revisión de Proteínas:** Evalúa si ${proteinas_dia} g están dentro del rango objetivo (${perfilUsuario.proteina_min}g - ${perfilUsuario.proteina_max}g) y su impacto en la <strong>Definición</strong>.
-        3. ⏱️ **Timing Nutricional (Pre/Post-Entreno):** Analiza la distribución de carbohidratos alrededor del horario de entrenamiento (${perfilUsuario.fitness.horario_entrenamiento}) y cómo afecta el rendimiento (Si es que ese dia entrenó, si no evalualo desde otra mirada).
-        4. 🥕 **Fibra y Calidad Nutricional:** Evalúa la ingesta de <strong>Fibra</strong> (${fibra_dia} g) y la cantidad de <strong>Ultraprocesados</strong>, ofreciendo consejos de saciedad.
-        5. 🧭 **Ajuste Prioritario y Recomendación:** Sugiere la corrección más urgente para el día siguiente o la recomendación más importante. Menciona un plato o ingrediente de las preferencias alimentarias (${Object.values(perfilUsuario.preferencias_alimentarias).flat().join(', ').substring(0, 100)}...) que lo facilite.
-        6. 💤 **Recuperación y Planificación:** Conecta la nutrición con el nivel de estrés (${perfilUsuario.salud_y_sostenibilidad.nivel_estres_dia}/10) y la <strong>planificación de la cena</strong> o el desayuno de mañana.
-
-    INSTRUCCIONES DE ANÁLISIS:
-
-    ${analysisTone}
-
-    ${contextItem}
-
-    ${analysisInstructions} // Mantienes las instrucciones específicas del momento para guiar el foco de los ítems.
-
-    `;
-    console.log(systemPrompt)
-    console.log(userQuery)
-    return await fetchGeminiCoachMessage(systemPrompt, userQuery);
+6. 💤 **Recuperación y Planificación Sostenible**
+Estrés nivel ${perfilUsuario.salud_y_sostenibilidad.nivel_estres_dia}/10. ${perfilUsuario.salud_y_sostenibilidad.nivel_estres_dia > 7 ? 'Prioriza descanso y comidas sencillas.' : 'Aprovecha para planificar.'} Hidratación clave.
+`;
 }
 
 
+
+/**
+ * Verifica si ya existe un análisis guardado para el día actual
+ * @param {string} userId - ID del usuario
+ * @param {string} selectedDay - Fecha seleccionada (formato YYYY-MM-DD)
+ * @returns {Promise<boolean>} - True si ya existe un análisis hoy
+ */
+async function checkAnalysisToday(userId, selectedDay) {
+    try {
+        // Primero, verificar si selectedDay es hoy
+        const today = new Date().toISOString().split('T')[0]; // Formato YYYY-MM-DD
+        const isToday = selectedDay === today;
+        
+        if (!isToday) {
+            return false; // No es hoy, permitir análisis sin restricción
+        }
+        
+        // Usar tu función existente para obtener el último análisis
+        const ultimoAnalisis = await obtenerUltimoAnalisis(userId, selectedDay);
+        
+        // Si hay un mensaje de análisis, significa que ya existe
+        return ultimoAnalisis && ultimoAnalisis.trim().length > 0;
+        
+    } catch (error) {
+        console.error("Error verificando análisis del día:", error);
+        return false; // En caso de error, permitir continuar
+    }
+}
+/**
+ * Función que se ejecuta al hacer click para generar el análisis del coach
+ */
+async function generateCoachAnalysis(selectedDay, consumed, expended, perfilUsuarioOnline, isToday, userId) {
+    const elements = {
+        coachMessage: document.getElementById('coachMessage')
+    };
+    
+    // 1. Si es hoy, verificar si ya hay análisis y pedir confirmación
+    if (isToday) {
+        const hasAnalysisToday = await checkAnalysisToday(userId, selectedDay);
+        
+        if (hasAnalysisToday) {
+            // Mostrar diálogo de confirmación para regenerar
+            const confirmed = await showAnalysisConfirmationDialog(
+                "existing", 
+                consumed,
+                expended
+            );
+            
+            if (!confirmed) {
+                return; // El usuario canceló
+            }
+        } else {
+            // No hay análisis hoy, mostrar confirmación normal
+            const confirmed = await showAnalysisConfirmationDialog(
+                "new", 
+                consumed,
+                expended
+            );
+            
+            if (!confirmed) {
+                return; // El usuario canceló
+            }
+        }
+    }
+    
+    // 2. Mostrar indicador de carga
+    elements.coachMessage.innerHTML = `
+        <div class="d-flex align-items-center justify-content-center gap-2">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <span>Generando análisis personalizado...</span>
+        </div>
+    `;
+
+    // 3. Obtener contexto previo (usando tu función existente)
+    const currentMoment = getMealCategory(new Date());
+    let mensajeCoachAnterior = "";
+    
+    if (isToday) {
+        mensajeCoachAnterior = await obtenerUltimoAnalisis(userId, selectedDay);
+        console.log("Contexto previo obtenido para el análisis:", mensajeCoachAnterior);
+    }
+    
+    // 4. Generar el mensaje del coach
+    try {
+        let message = await generarMensajeCoach(
+            consumed, 
+            expended, 
+            perfilUsuarioOnline, 
+            currentMoment, 
+            mensajeCoachAnterior
+        );
+        
+        // 5. Mostrar el mensaje generado
+        elements.coachMessage.innerHTML = sanitizeHTML(message);
+
+        // 6. Guardar el nuevo mensaje (solo si es hoy)
+        if (isToday) {
+            await guardarAnalisisCoach(userId, selectedDay, currentMoment, message);
+            console.log("✅ Análisis guardado en Firebase");
+        }
+        
+        // 7. Agregar botón para regenerar si se desea
+        elements.coachMessage.innerHTML += `
+            <div class="text-center mt-3">
+                <button id="regenerateCoachBtn" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-sync-alt me-1"></i>Generar Nuevo Análisis
+                </button>
+            </div>
+        `;
+        
+        // Configurar event listener para regenerar
+        setTimeout(() => {
+            const regenerateBtn = document.getElementById('regenerateCoachBtn');
+            if (regenerateBtn) {
+                regenerateBtn.addEventListener('click', () => {
+                    generateCoachAnalysis(selectedDay, consumed, expended, perfilUsuarioOnline, isToday, userId);
+                });
+            }
+        }, 100);
+        
+    } catch (error) {
+        console.error("❌ Error generando mensaje del coach:", error);
+        
+        elements.coachMessage.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Error al conectar con el servicio de análisis</strong>
+                <p class="mb-2 mt-2">Balance del día: ${(consumed - expended) > 0 ? '+' : ''}${consumed - expended} Kcal.</p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <button id="retryCoachBtn" class="btn btn-sm btn-primary">
+                        <i class="fas fa-redo me-1"></i>Reintentar
+                    </button>
+                    <button id="basicAnalysisBtn" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-chart-simple me-1"></i>Ver resumen básico
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Configurar event listeners para reintentar
+        setTimeout(() => {
+            const retryBtn = document.getElementById('retryCoachBtn');
+            const basicBtn = document.getElementById('basicAnalysisBtn');
+            
+            if (retryBtn) {
+                retryBtn.addEventListener('click', () => {
+                    generateCoachAnalysis(selectedDay, consumed, expended, perfilUsuarioOnline, isToday, userId);
+                });
+            }
+            
+            if (basicBtn) {
+                basicBtn.addEventListener('click', () => {
+                    showBasicAnalysis(consumed, expended);
+                });
+            }
+        }, 100);
+    }
+}
+
+
+
+/**
+ * Muestra un diálogo de confirmación personalizado para análisis
+ * @param {string} type - "new" o "existing"
+ * @param {number} consumed - Calorías consumidas
+ * @param {number} expended - Calorías gastadas
+ * @returns {Promise<boolean>} - True si el usuario confirma
+ */
+function showAnalysisConfirmationDialog(type, consumed, expended) {
+    return new Promise((resolve) => {
+        // Si no usas Bootstrap o prefieres confirm nativo, usa esto:
+        const balance = consumed - expended;
+        
+        if (type === "existing") {
+            const message = `⚠️ Ya tienes un análisis generado hoy.\n\n` +
+                          `Datos actuales:\n` +
+                          `• Consumo: ${consumed} kcal\n` +
+                          `• Gasto ejercicio: ${expended} kcal\n` +
+                          `• Balance: ${balance > 0 ? '+' : ''}${balance} kcal\n\n` +
+                          `¿Quieres generar un nuevo análisis?`;
+            
+            resolve(confirm(message));
+        } else {
+            const message = `📊 Generar análisis del coach\n\n` +
+                          `Basado en:\n` +
+                          `• Consumo: ${consumed} kcal\n` +
+                          `• Gasto ejercicio: ${expended} kcal\n` +
+                          `• Balance: ${balance > 0 ? '+' : ''}${balance} kcal\n\n` +
+                          `¿Continuar?`;
+            
+            resolve(confirm(message));
+        }
+    });
+}
+
+/**
+ * Muestra un análisis básico cuando falla la generación con IA
+ */
+function showBasicAnalysis(consumed, expended) {
+    const elements = {
+        coachMessage: document.getElementById('coachMessage')
+    };
+    
+    const netBalance = consumed - expended;
+    const proteinasDia = currentLogData?.proteinas_dia || 0;
+    const carbosDia = currentLogData?.carbohidratos_dia || 0;
+    const grasasDia = currentLogData?.grasas_dia || 0;
+    
+    let message = `<h6 class="mb-3"><i class="fas fa-chart-simple me-2"></i>Resumen del Día</h6>`;
+    
+    // Evaluación calórica simple
+    if (netBalance > 500) {
+        message += `<div class="alert alert-warning py-2 mb-2">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            <strong>Balance alto:</strong> +${netBalance} Kcal
+        </div>`;
+    } else if (netBalance <= 0 && netBalance > -500) {
+        message += `<div class="alert alert-success py-2 mb-2">
+            <i class="fas fa-check-circle me-1"></i>
+            <strong>Balance equilibrado:</strong> ${netBalance} Kcal
+        </div>`;
+    } else if (netBalance <= -500) {
+        message += `<div class="alert alert-info py-2 mb-2">
+            <i class="fas fa-fire me-1"></i>
+            <strong>Déficit significativo:</strong> ${netBalance} Kcal
+        </div>`;
+    } else {
+        message += `<div class="alert alert-secondary py-2 mb-2">
+            <strong>Balance:</strong> ${netBalance > 0 ? '+' : ''}${netBalance} Kcal
+        </div>`;
+    }
+    
+    // Macronutrientes básicos
+    message += `
+        <div class="card border-0 bg-light mb-3">
+            <div class="card-body py-2">
+                <h6 class="small mb-2"><strong>Macronutrientes:</strong></h6>
+                <div class="d-flex justify-content-between small">
+                    <span>Proteínas: <strong>${proteinasDia}g</strong></span>
+                    <span>Carbos: <strong>${carbosDia}g</strong></span>
+                    <span>Grasas: <strong>${grasasDia}g</strong></span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    message += `
+        <div class="text-center">
+            <button id="tryAgainBtn" class="btn btn-primary btn-sm">
+                <i class="fas fa-robot me-1"></i>Intentar con Análisis IA
+            </button>
+        </div>
+    `;
+    
+    elements.coachMessage.innerHTML = message;
+    
+    // Configurar botón para intentar nuevamente
+    setTimeout(() => {
+        const tryAgainBtn = document.getElementById('tryAgainBtn');
+        if (tryAgainBtn) {
+            tryAgainBtn.addEventListener('click', () => {
+                // Esta función debería llamar a generateCoachAnalysis con los parámetros necesarios
+                console.log("Intento de regenerar análisis...");
+            });
+        }
+    }, 100);
+}
 
 // --- Renderizado de Log ---
 async function renderSelectedDay() {
@@ -948,7 +1618,6 @@ async function renderSelectedDay() {
     const expended = data.gastado || 0;
     const netBalance = Number((consumed - expended).toFixed(2));
 
-    
     // ✅ RENDERIZAR INMEDIATAMENTE los números
     elements.totalConsumido.textContent = consumed;
     elements.totalGastado.textContent = expended;
@@ -961,60 +1630,32 @@ async function renderSelectedDay() {
     elements.loadingIndicator.style.display = 'none';
     elements.summaryContent.style.display = 'block';
 
-    // // ✅ AHORA SÍ: Generar mensaje del coach de forma asíncrona (NO bloqueante)
-
+    // // Generar mensaje del coach de forma asíncrona (NO bloqueante)
     if (consumed === 0 && expended === 0) {
         elements.coachMessage.textContent = `No hay registros para ${isToday ? 'hoy' : formatDate(selectedDay)}.`;
+        // Ocultar botón de análisis si no hay registros
+        elements.coachButton.style.display = 'none';
     } else if (perfilUsuarioOnline) {
-        // Mostrar indicador de carga
+        // MOSTRAR BOTÓN DE ANÁLISIS EN LUGAR DE GENERAR AUTOMÁTICAMENTE
         elements.coachMessage.innerHTML = `
-            <div class="d-flex align-items-center gap-2">
-                <div class="spinner-border spinner-border-sm text-primary" role="status">
-                    <span class="visually-hidden">Cargando...</span>
-                </div>
-                <span>Analizando tu día...</span>
+            <div class="text-center">
+                <p class="mb-3">📊 Hay registros para ${isToday ? 'hoy' : formatDate(selectedDay)}</p>
+                <button id="generateCoachBtn" class="btn btn-primary">
+                    <i class="fas fa-robot me-2"></i>Generar Análisis del Coach
+                </button>
             </div>
         `;
         
-        // codigo anterior funcionando:    
-        // const mensajeCoachAnteriorEnElDia = ""
+        // Configurar el event listener para el botón
+        setTimeout(() => {
+            const generateBtn = document.getElementById('generateCoachBtn');
+            if (generateBtn) {
+                generateBtn.addEventListener('click', () => {
+                    generateCoachAnalysis(selectedDay, consumed, expended, perfilUsuarioOnline, isToday, userId);
+                });
+            }
+        }, 100);
         
-        // // Generar mensaje en background (sin await en esta función)
-        // generarMensajeCoach(consumed, expended, perfilUsuarioOnline, getMealCategory(new Date().getHours()), mensajeCoachAnteriorEnElDia)
-        //     .then(message => {
-        //         elements.coachMessage.innerHTML  = sanitizeHTML(message);
-        //     })
-        //     .catch(error => {
-        //         console.error("Error generando mensaje del coach:", error);
-        //         elements.coachMessage.textContent = `Balance del día: ${netBalance > 0 ? '+' : ''}${netBalance} Kcal.`;
-        //     });
-    
-    // --- Lógica de Contexto y Generación ---
-        const currentMoment = getMealCategory(new Date()); // Obtiene 'Desayuno', 'Almuerzo', etc.
-        let mensajeCoachAnterior = "";
-
-        // Solo buscar análisis previos si es el día actual
-        if (isToday) {
-            // 1. OBTENER EL ÚLTIMO ANÁLISIS DEL DÍA COMO CONTEXTO PREVIO
-            mensajeCoachAnterior = await obtenerUltimoAnalisis(userId, selectedDay);
-            console.log("mensajeCoachAnterior ->")
-            console.log(mensajeCoachAnterior)
-        }
-        // 2. GENERAR EL MENSAJE
-        generarMensajeCoach(consumed, expended, perfilUsuarioOnline, currentMoment, mensajeCoachAnterior)
-            .then(async (message) => { // Usamos async aquí para el await en guardarAnalisis
-                elements.coachMessage.innerHTML = sanitizeHTML(message);
-
-                // 3. GUARDAR EL NUEVO MENSAJE GENERADO PARA FUTURA RETROALIMENTACIÓN
-                if (isToday) {
-                    await guardarAnalisisCoach(userId, selectedDay, currentMoment, message);
-                }
-            })
-            .catch(error => {
-                console.error("Error generando mensaje del coach:", error);
-                elements.coachMessage.textContent = `Balance del día: ${netBalance > 0 ? '+' : ''}${netBalance} Kcal.`;
-            });
-    
     } else {
         // Mensaje básico si no hay perfil configurado
         let message = '';
@@ -1028,17 +1669,18 @@ async function renderSelectedDay() {
             message = `Balance del día: ${netBalance > 0 ? '+' : ''}${netBalance} Kcal.`;
         }
         elements.coachMessage.textContent = message;
+        elements.coachButton.style.display = 'none';
     }
+   
 }
 
 
 const MEAL_TIMES = {
     DESAYUNO: { start: 6, end: 12 },
-    COLACION_MANANA: { start: 11, end: 12 },
-    ALMUERZO: { start: 12, end: 15 },
-    MERIENDA: { start: 15, end: 18 },
-    CENA: { start: 18, end: 22 },
-    COLACION_NOCHE: { start: 22, end: 24 }
+    ALMUERZO: { start: 12, end: 14.50 },
+    MERIENDA: { start: 14.50, end: 20.50 },
+    CENA: { start: 20.50, end: 23 },
+    COLACION_NOCHE: { start: 23, end: 24 }
 };
 
 function getMealCategory(dateObj) {
@@ -1046,8 +1688,6 @@ function getMealCategory(dateObj) {
 
     if (hour >= MEAL_TIMES.DESAYUNO.start && hour < MEAL_TIMES.DESAYUNO.end) {
         return 'Desayuno';
-    // } else if (hour >= MEAL_TIMES.COLACION_MANANA.start && hour < MEAL_TIMES.COLACION_MANANA.end) {
-    //     return 'Colación';
     } else if (hour >= MEAL_TIMES.ALMUERZO.start && hour < MEAL_TIMES.ALMUERZO.end) {
         return 'Almuerzo';
     } else if (hour >= MEAL_TIMES.MERIENDA.start && hour < MEAL_TIMES.MERIENDA.end) {
@@ -1493,6 +2133,7 @@ elements.registroConsumoForm.addEventListener('submit', async (e) => {
             grasas: datosNutricionales.grasas,
             fibra: datosNutricionales.fibra,
             procesado: datosNutricionales.procesado
+            // receta: // agrego recetas previamente guardadas
         };
         
         console.log("DEBUG nuevoItem:", nuevoItem);
