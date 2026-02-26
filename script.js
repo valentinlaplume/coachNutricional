@@ -90,8 +90,31 @@ if (!isCanvasEnvironment && GEMINI_API_KEYS.length > 0) {
 } else {
     API_KEY = null; // En Canvas usaremos otra lógica
 }
+// Opción más recomendada y rápida
+// const MODEL_NAME = "gemini-2.5-flash"; //"gemini-2.5-flash-lite"; 
+// const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent`;
 
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
+const GEMINI_MODELS = [
+    "gemini-2.5-flash-lite",  // 🥇 más rápida, arrancar acá
+    "gemini-2.5-flash",       // fallback con más inteligencia
+    "gemini-2.0-flash",       // fallback estable
+    "gemini-1.5-flash"        // último recurso
+];
+
+let currentModelIndex = 0;
+
+function getCurrentModel() {
+    return GEMINI_MODELS[currentModelIndex];
+}
+
+function getApiUrl() {
+    return `https://generativelanguage.googleapis.com/v1beta/models/${getCurrentModel()}:generateContent`;
+}
+
+function rotateModel() {
+    currentModelIndex = (currentModelIndex + 1) % GEMINI_MODELS.length;
+    console.log(`🔄 Rotando a modelo: ${getCurrentModel()}`);
+}
 
 let db, auth, userId = null;
 
@@ -608,10 +631,10 @@ async function fetchGeminiCoachMessage(systemPrompt, userQuery) {
         contents: [{ parts: [{ text: userQuery }] }],
         systemInstruction: { parts: [{ text: systemPrompt }] },
         generationConfig: {
-            temperature: 0.7,  // Para balance estructura/creatividad
+            temperature: 0.7,
             topP: 0.95,
             topK: 40,
-            maxOutputTokens: 1500,  // Suficiente para 6 ítems
+            maxOutputTokens: 1500,
             responseMimeType: "application/json",
             responseSchema: {
                 type: "OBJECT",
@@ -626,11 +649,21 @@ async function fetchGeminiCoachMessage(systemPrompt, userQuery) {
         }
     };
 
-    const url = `${GEMINI_API_URL}?key=${API_KEY}`;
     const MAX_RETRIES = 3;
 
     for (let i = 0; i < MAX_RETRIES; i++) {
         try {
+            // OBTENER LA API KEY CORRECTAMENTE del ApiKeyManager
+            const currentKey = API_KEY.getCurrentKey();
+            
+            // Verificar que la key sea válida
+            if (!currentKey || typeof currentKey !== 'string') {
+                throw new Error("API key no disponible o inválida");
+            }
+            
+            const url = `${getApiUrl()}?key=${currentKey}`;
+            console.log(`Usando API key: ${currentKey.substring(0, 8)}... para intento ${i + 1}`);
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -638,28 +671,57 @@ async function fetchGeminiCoachMessage(systemPrompt, userQuery) {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                if (response.status === 404) {
+                    console.warn(`Modelo ${getCurrentModel()} no disponible. Rotando...`);
+                    rotateModel();
+                    if (i < MAX_RETRIES - 1) continue;
+                }
+
+                // Si es error 429 (rate limit) o 403 (quota), rotar la key
+                if (response.status === 429 || response.status === 403) {
+                    console.warn(`Key ${currentKey.substring(0, 8)}... excedió límite. Rotando...`);
+                    API_KEY.markKeyFailed(currentKey);
+                    
+                    // Continuar con siguiente intento con nueva key
+                    if (i < MAX_RETRIES - 1) {
+                        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                        continue;
+                    }
+                }
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const result = await response.json();
             const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!jsonText) throw new Error("Respuesta vacía");
+            
+            if (!jsonText) {
+                throw new Error("Respuesta vacía de Gemini");
+            }
             
             const parsedJson = JSON.parse(jsonText);
             const mensaje = parsedJson.mensaje;
 
             if (typeof mensaje === 'string' && mensaje.length > 0) {
+                // Incrementar contador de solicitudes exitosas
+                API_KEY.incrementRequest();
+                console.log(`✅ Mensaje coach obtenido con éxito`);
                 return mensaje;
             }
-            throw new Error("Mensaje inválido");
+            throw new Error("Mensaje inválido en respuesta");
 
         } catch (error) {
             console.warn(`Intento ${i + 1} de mensaje coach fallido:`, error.message);
-            if (i === MAX_RETRIES - 1) {
-                // Mensaje de fallback si falla la IA
+            
+            // Si no es un error HTTP y tenemos más intentos, esperar antes de reintentar
+            if (i < MAX_RETRIES - 1) {
+                const waitTime = Math.pow(2, i) * 1000;
+                console.log(`Esperando ${waitTime}ms antes de reintentar...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            } else {
+                // Último intento fallido
+                console.error("Todos los intentos fallaron para mensaje del coach");
                 return "📊 Sigue registrando tus comidas para recibir retroalimentación personalizada.";
             }
-            await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
         }
     }
     return "📊 Sigue registrando tus comidas para recibir retroalimentación personalizada.";
@@ -1548,6 +1610,8 @@ function showBasicAnalysis(consumed, expended) {
     }, 100);
 }
 
+
+
 // --- Renderizado de Log ---
 async function renderSelectedDay() {
     const data = weekData[selectedDay] || {
@@ -1608,7 +1672,7 @@ async function renderSelectedDay() {
         inputs.forEach(input => {
             input.disabled = false;
             input.placeholder = input.id.includes('Consumo') 
-                ? "Ej: Tostadas con palta" 
+                ? "Ej: 1 huevo hervido" 
                 : "Ej: 30 min de correr";
         });
         buttons.forEach(btn => btn.disabled = false);
@@ -1768,7 +1832,7 @@ function renderCombinedLog(logConsumed, logExpended) {
                     </div>
                     <!-- Segunda fila -->
                     <div class="col-12">
-                    🥑 Grasas: <strong>${g}g</strong>
+                        🥑 Grasas: <strong>${g}g</strong>
                     </div>
                     <div class="col-12">
                         🥕 Fibra: <strong>${f}g</strong>
@@ -2048,19 +2112,36 @@ async function fetchGeminiExpenditure(activityDescription) {
 
 async function sendGeminiRequest(systemPrompt, userQuery, responseSchema) {
     const payload = {
-        contents: [{ parts: [{ text: userQuery }] }],
+        contents: [{ role: "user", parts: [{ text: userQuery }] }],
         systemInstruction: { parts: [{ text: systemPrompt }] },
         generationConfig: {
+            temperature: 0.2,
             responseMimeType: "application/json",
             responseSchema: responseSchema
         }
     };
 
-    const url = `${GEMINI_API_URL}?key=${API_KEY}`;
     const MAX_RETRIES = 3;
 
     for (let i = 0; i < MAX_RETRIES; i++) {
+        let currentKey = null;
+        
         try {
+            // OBTENER LA API KEY CORRECTAMENTE
+            if (!API_KEY || typeof API_KEY.getCurrentKey !== 'function') {
+                throw new Error("ApiKeyManager no inicializado correctamente");
+            }
+            
+            currentKey = API_KEY.getCurrentKey();
+            
+            // Validar que tengamos una key válida
+            if (!currentKey || typeof currentKey !== 'string') {
+                throw new Error("No hay API keys disponibles o son inválidas");
+            }
+            
+            const url = `${getApiUrl()}?key=${currentKey}`;
+            console.log(`Intento ${i + 1} con API key: ${currentKey.substring(0, 8)}...`);
+
             const response = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -2068,25 +2149,83 @@ async function sendGeminiRequest(systemPrompt, userQuery, responseSchema) {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                if (response.status === 404) {
+                    console.warn(`Modelo ${getCurrentModel()} no disponible. Rotando...`);
+                    rotateModel();
+                    if (i < MAX_RETRIES - 1) continue;
+                }
+
+                // Manejar errores específicos de rate limit y quota
+                if (response.status === 429 || response.status === 403) {
+                    console.warn(`Key ${currentKey.substring(0, 8)}... excedió límites (${response.status})`);
+                    
+                    // Marcar la key como fallida
+                    API_KEY.markKeyFailed(currentKey);
+                    
+                    // Verificar si quedan keys disponibles
+                    const availableKeys = API_KEY.getAvailableKeys();
+                    if (availableKeys.length === 0) {
+                        throw new Error(`Todas las API keys han excedido sus límites. Cooldown activado.`);
+                    }
+                    
+                    // Si no es el último intento, continuar con nueva key
+                    if (i < MAX_RETRIES - 1) {
+                        console.log(`Rotando a nueva key. Disponibles: ${availableKeys.length}`);
+                        await new Promise(res => setTimeout(res, Math.pow(2, i) * 1000));
+                        continue;
+                    }
+                }
+                
+                // Otros errores HTTP
+                const errorText = await response.text().catch(() => 'Sin detalles');
+                throw new Error(`HTTP ${response.status}: ${response.statusText}. ${errorText}`);
             }
 
             const result = await response.json();
             const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-            if (!jsonText) throw new Error("Respuesta vacía");
+            if (!jsonText) {
+                // Aunque la respuesta fue exitosa, no tiene contenido válido
+                console.warn("Respuesta vacía de Gemini, pero HTTP 200 OK");
+                throw new Error("Respuesta vacía de la API");
+            }
 
-            const parsed = JSON.parse(jsonText);
-            return parsed;
+            // Intentar parsear la respuesta JSON
+            try {
+                const parsed = JSON.parse(jsonText);
+                
+                // Incrementar contador de solicitudes exitosas
+                API_KEY.incrementRequest();
+                console.log(`✅ Solicitud completada exitosamente`);
+                
+                return parsed;
+            } catch (parseError) {
+                console.error("Error parseando JSON:", parseError);
+                console.log("Texto recibido:", jsonText.substring(0, 200) + "...");
+                throw new Error("Respuesta JSON inválida de Gemini");
+            }
 
         } catch (error) {
             console.warn(`Intento ${i + 1} fallido:`, error.message);
-            if (i === MAX_RETRIES - 1) throw error;
-            await new Promise(res => setTimeout(res, Math.pow(2, i) * 1000));
+            
+            // Si es el último intento, lanzar el error
+            if (i === MAX_RETRIES - 1) {
+                // Verificar si es error de rate limit general
+                if (error.message.includes("Todas las API keys")) {
+                    const waitTime = API_KEY?.config?.cooldownTime || 60000;
+                    console.error(`⚠️ Todas las keys en cooldown. Espera ${waitTime/1000} segundos.`);
+                }
+                throw new Error(`Fallo en AI después de ${MAX_RETRIES} intentos: ${error.message}`);
+            }
+            
+            // Esperar antes de reintentar (exponential backoff)
+            const waitTime = Math.pow(2, i) * 1000;
+            console.log(`Esperando ${waitTime}ms antes de reintentar...`);
+            await new Promise(res => setTimeout(res, waitTime));
         }
     }
 
-    throw new Error("Fallo en AI");
+    throw new Error("Fallo en AI: Máximo de reintentos alcanzado");
 }
 
 // --- Manejadores de Formularios ---

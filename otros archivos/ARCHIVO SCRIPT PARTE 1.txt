@@ -1,0 +1,678 @@
+// ============================================================================
+// === IMPORTACIONES Y CONFIGURACIÓN INICIAL ===
+// ============================================================================
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { 
+    getFirestore, 
+    doc, 
+    setDoc, 
+    onSnapshot, 
+    collection, 
+    query, 
+    getDocs, 
+    orderBy, 
+    where, 
+    Timestamp, 
+    limit 
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+import { 
+    FIREBASE_CONFIG_PERSONAL,
+    GEMINI_API_KEYS,
+    RATE_LIMIT_CONFIG,
+    APP_PROJECT_ID 
+} from './config.js';
+
+// ============================================================================
+// === CLASE: GESTOR DE CLAVES API (Rate Limiting) ===
+// ============================================================================
+
+class GestorClavesAPI {
+    constructor(claves, configuracion = {}) {
+        this.claves = claves;
+        this.indiceActual = 0;
+        this.clavesFallidas = new Set();
+        this.contadorSolicitudes = 0;
+        this.config = {
+            solicitudesPorClave: configuracion.requestsPerKey || 20,
+            tiempoEspera: configuracion.cooldownTime || 60000,
+            ...configuracion
+        };
+    }
+
+    obtenerClaveActual() {
+        return this.claves[this.indiceActual];
+    }
+
+    rotarClave() {
+        this.contadorSolicitudes = 0;
+        this.indiceActual = (this.indiceActual + 1) % this.claves.length;
+        
+        if (this.clavesFallidas.size === this.claves.length) {
+            console.warn('Todas las claves API han fallado. Esperando cooldown...');
+            setTimeout(() => {
+                this.clavesFallidas.clear();
+                console.log('Reiniciando sistema de claves API');
+            }, this.config.tiempoEspera);
+        }
+    }
+
+    marcarClaveFallida(clave) {
+        this.clavesFallidas.add(clave);
+        this.rotarClave();
+    }
+
+    incrementarContador() {
+        this.contadorSolicitudes++;
+        if (this.contadorSolicitudes >= this.config.solicitudesPorClave) {
+            console.log(`Rotando clave API después de ${this.contadorSolicitudes} solicitudes`);
+            this.rotarClave();
+        }
+    }
+
+    obtenerClavesDisponibles() {
+        return this.claves.filter(clave => !this.clavesFallidas.has(clave));
+    }
+}
+
+// ============================================================================
+// === VARIABLES GLOBALES Y CONSTANTES ===
+// ============================================================================
+
+const esEntornoCanvas = typeof __firebase_config !== 'undefined';
+const configuracionFirebase = esEntornoCanvas ? JSON.parse(__firebase_config) : FIREBASE_CONFIG_PERSONAL;
+const tokenAutenticacionInicial = esEntornoCanvas ? __initial_auth_token : null;
+const idAplicacion = esEntornoCanvas ? __app_id : APP_PROJECT_ID;
+
+// Gestor de claves API
+let CLAVE_API;
+if (!esEntornoCanvas && GEMINI_API_KEYS.length > 0) {
+    CLAVE_API = new GestorClavesAPI(GEMINI_API_KEYS, RATE_LIMIT_CONFIG);
+} else {
+    CLAVE_API = null;
+}
+
+const URL_API_GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent";
+
+let baseDatos, autenticacion, idUsuario = null;
+
+// Constantes de tiempo
+const NOMBRES_DIAS_SEMANA = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
+const HORARIOS_COMIDAS = {
+    DESAYUNO: { inicio: 6, fin: 12 },
+    ALMUERZO: { inicio: 12, fin: 14.50 },
+    MERIENDA: { inicio: 14.50, fin: 20.50 },
+    CENA: { inicio: 20.50, fin: 23 },
+    COLACION_NOCHE: { inicio: 23, fin: 24 }
+};
+
+// Estado de la aplicación
+let diaSeleccionado = obtenerFechaLocalISO();
+let inicioSemanaActual = new Date();
+let datosSemana = {};
+let datosLogActual = {
+    log_consumido: [],
+    log_gastado: [],
+    consumido: 0,
+    gastado: 0
+};
+let desuscripcionesLog = [];
+
+// Usuarios
+const PERSONAS = [
+    { id: 'valentin', nombre: 'Valentín' },
+    { id: 'sofia', nombre: 'Sofía' }
+];
+
+let idPersonaActiva = PERSONAS[0].id;
+let nombrePersonaActiva = PERSONAS[0].nombre;
+
+// ============================================================================
+// === CONFIGURACIÓN DE PERFILES DE USUARIO ===
+// ============================================================================
+
+const perfilesUsuario = {
+    valentin: {
+        edad: 25,
+        sexo: 'masculino',
+        peso_actual: 75,
+        altura: 174,
+        peso_objetivo: 72,
+        objetivo: 'definición',
+        ritmo_semanal: 0.5,
+        tmb: 1718,
+        tdee: 2835,
+        calorias_objetivo: 2300,
+        proteina_min: 105,
+        proteina_max: 165,
+        carbos_rango_porcentaje: '40-55%',
+        grasas_rango_porcentaje: '20-30%',
+        preferencias: {
+            evita_ultraprocesados: true,
+            alergias_medicas: ['ninguna'],
+            cantidad_comidas_al_dia: 4,
+            habilidades_cocina: 'básico',
+            suplementos_actuales: ['creatina']
+        },
+        fitness: {
+            nivel_actividad: 'moderado',
+            tipo_entrenamiento: 'Fuerza (4 días) + Cardio (1 día)',
+            frecuencia_semanal: 5,
+            horario_entrenamiento: 'Tarde (17:30h)',
+            experiencia_entrenamiento: 'Intermedio-Avanzado',
+            objetivo_estetico: 'Hombros, espalda y abdominales marcados',
+            objetivo_rendimiento_cuantificable: 'Ser mas atlético'
+        },
+        salud_y_sostenibilidad: {
+            nivel_estres_dia: 4,
+            hora_habitual_dormir: '12:30',
+            hora_habitual_despertar: '08:30',
+            tiempo_libre_cocina_semanal: '40 mins por dia',
+            dias_flexibilidad_preferidos: ['Sábado noche', 'Domingo tarde/noche']
+        },
+        preferencias_alimentarias: {
+            opciones_rapidas_faciles: [
+                "Huevo (hervido, revuelto, en todas las versiones)",
+                "Yogurt casero natural",
+                "Atún en lata",
+                "Frutas de todo tipo",
+                "Ricota"
+            ],
+            carbohidratos_favoritos: [
+                "Pan integral de masa madre",
+                "Frutas de todo tipo",
+                "Zapallo",
+                "Papa",
+                "Batata",
+                "Lentejas"
+            ],
+            proteinas_favoritas: [
+                "Pollo",
+                "Carne",
+                "Pescado",
+                "Atún en lata",
+                "Huevo",
+                "Ricota",
+                "Soja texturizada"
+            ]
+        }
+    },
+    sofia: {
+        edad: 25,
+        sexo: 'femenino',
+        peso_actual: 59,
+        altura: 160,
+        peso_objetivo: 56,
+        objetivo: 'definición',
+        ritmo_semanal: 0.4,
+        tmb: 1304,
+        tdee: 2021,
+        calorias_objetivo: 1621,
+        proteina_min: 94,
+        proteina_max: 130,
+        carbos_rango_porcentaje: '40-55%',
+        grasas_rango_porcentaje: '20-30%'
+    }
+};
+
+// ============================================================================
+// === MAPEO DE ELEMENTOS DEL DOM ===
+// ============================================================================
+
+const elementos = {
+    indicadorCarga: document.getElementById('loadingIndicator'),
+    nombreUsuarioActivo: document.getElementById('activeUserName'),
+    textoDelDiaSeleccionado: document.getElementById('selectedDayDisplay'),
+    fechaActualMostrada: document.getElementById('currentDateDisplay'),
+    
+    // Navegación semanal
+    botonSemanaPrev: document.getElementById('prevWeekBtn'),
+    botonSemanaSig: document.getElementById('nextWeekBtn'),
+    textoRangoSemana: document.getElementById('weekRangeDisplay'),
+    contenedorSelectorDias: document.getElementById('daySelectorContainer'),
+    
+    // Resumen semanal
+    totalConsumidoSemana: document.getElementById('totalConsumidoSemana'),
+    totalGastadoSemana: document.getElementById('totalGastadoSemana'),
+    balanceNetoSemana: document.getElementById('netBalanceSemana'),
+    cajaBalanceNetoSemana: document.getElementById('balanceNetoSemanaBox'),
+    
+    // Formularios de entrada
+    cargaApiConsumo: document.getElementById('apiConsumoLoading'),
+    botonEnviarConsumo: document.getElementById('submitConsumoButton'),
+    formularioConsumo: document.getElementById('registroConsumoForm'),
+    inputDescripcionConsumo: document.getElementById('descripcionConsumo'),
+    cargaApiGasto: document.getElementById('apiGastoLoading'),
+    botonEnviarGasto: document.getElementById('submitGastoButton'),
+    formularioGasto: document.getElementById('registroGastoForm'),
+    inputDescripcionGasto: document.getElementById('descripcionGasto'),
+    
+    // Resumen diario
+    cajaConsumido: document.getElementById('consumidoBox'),
+    cajaGastado: document.getElementById('gastadoBox'),
+    textoTotalConsumido: document.getElementById('totalConsumido'),
+    textoTotalGastado: document.getElementById('totalGastado'),
+    textoBalanceNeto: document.getElementById('netBalance'),
+    cajaBalanceNeto: document.getElementById('balanceNetoBox'),
+    mensajeCoach: document.getElementById('coachMessage'),
+    botonCoach: document.getElementById('coachButton'),
+    logComidas: document.getElementById('foodLog'),
+    mensajeLogVacio: document.getElementById('emptyLogMessage'),
+    textoUsuarioLogVacio: document.getElementById('emptyLogUser'),
+    contenidoPrincipal: document.getElementById('summaryContent'),
+    botonSeleccionarValentin: document.getElementById('selectValentinBtn'),
+    botonSeleccionarSofia: document.getElementById('selectSofiaBtn'),
+    
+    // Macronutrientes
+    textoProteinas: document.getElementById('proteinasDia'),
+    textoCarbohidratos: document.getElementById('carbohidratosDia'),
+    textoGrasas: document.getElementById('grasasDia'),
+    textoFibra: document.getElementById('fibraDia'),
+    textoUltraprocesados: document.getElementById('ultraprocesadosDia'),
+    
+    // Progreso de metas
+    progresoProteinas: document.getElementById('proteinaProgress'),
+    progresoCarbohidratos: document.getElementById('carbohidratosProgress'),
+    progresoGrasas: document.getElementById('grasasProgress'),
+    progresoFibra: document.getElementById('fibraProgress'),
+    progresoKcalObjetivo: document.getElementById('kcalTargetProgress'),
+    
+    // Modal
+    modalDetalles: new bootstrap.Modal(document.getElementById('logDetailsModal')),
+    tituloModalDetalles: document.getElementById('logDetailsModalLabel'),
+    contenidoModalLog: document.getElementById('modalLogContent'),
+    etiquetaTotalModal: document.getElementById('modalTotalLabel'),
+    valorTotalModal: document.getElementById('modalTotalValue')
+};
+
+elementos.indicadorCarga.style.display = 'block';
+elementos.contenidoPrincipal.style.display = 'none';
+
+// ============================================================================
+// === UTILIDADES: FECHAS Y FORMATO ===
+// ============================================================================
+
+function obtenerFechaLocalISO() {
+    const ahora = new Date();
+    const año = ahora.getFullYear();
+    const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+    const dia = String(ahora.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+}
+
+function obtenerInicioSemana(fecha) {
+    const d = new Date(fecha);
+    const dia = d.getDay();
+    const diferencia = d.getDate() - dia + (dia === 0 ? -6 : 1);
+    d.setDate(diferencia);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function obtenerDiasSemanaISO(inicioDeSemana) {
+    const dias = [];
+    let diaActual = new Date(inicioDeSemana);
+    for (let i = 0; i < 7; i++) {
+        const año = diaActual.getFullYear();
+        const mes = String(diaActual.getMonth() + 1).padStart(2, '0');
+        const dia = String(diaActual.getDate()).padStart(2, '0');
+        dias.push(`${año}-${mes}-${dia}`);
+        diaActual.setDate(diaActual.getDate() + 1);
+    }
+    return dias;
+}
+
+function formatearFecha(fechaISO) {
+    const [año, mes, dia] = fechaISO.split('-');
+    const fecha = new Date(año, mes - 1, dia);
+    return fecha.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
+function obtenerNombreDiaCorto(fechaISO) {
+    const [año, mes, dia] = fechaISO.split('-');
+    const fecha = new Date(año, mes - 1, dia);
+    let indiceDia = fecha.getDay();
+    if (indiceDia === 0) indiceDia = 6; else indiceDia--;
+    return NOMBRES_DIAS_SEMANA[indiceDia];
+}
+
+function obtenerCategoriaComida(objetoFecha) {
+    const hora = objetoFecha.getHours();
+
+    if (hora >= HORARIOS_COMIDAS.DESAYUNO.inicio && hora < HORARIOS_COMIDAS.DESAYUNO.fin) {
+        return 'Desayuno';
+    } else if (hora >= HORARIOS_COMIDAS.ALMUERZO.inicio && hora < HORARIOS_COMIDAS.ALMUERZO.fin) {
+        return 'Almuerzo';
+    } else if (hora >= HORARIOS_COMIDAS.MERIENDA.inicio && hora < HORARIOS_COMIDAS.MERIENDA.fin) {
+        return 'Merienda';
+    } else if (hora >= HORARIOS_COMIDAS.CENA.inicio && hora < HORARIOS_COMIDAS.CENA.fin) {
+        return 'Cena';
+    } else {
+        return 'Colación';
+    }
+}
+
+// ============================================================================
+// === FIREBASE: INICIALIZACIÓN Y REFERENCIAS ===
+// ============================================================================
+
+function obtenerReferenciaDocumentoDiario(fechaISO = diaSeleccionado) {
+    const rutaDoc = `/artifacts/${idAplicacion}/users/${idUsuario}/datos_caloricos/${idPersonaActiva}_${fechaISO}`;
+    return doc(baseDatos, rutaDoc);
+}
+
+async function inicializarFirebase() {
+    try {
+        const app = initializeApp(configuracionFirebase);
+        baseDatos = getFirestore(app);
+        autenticacion = getAuth(app);
+        
+        if (tokenAutenticacionInicial) {
+            await signInWithCustomToken(autenticacion, tokenAutenticacionInicial);
+        } else {
+            await signInAnonymously(autenticacion);
+        }
+
+        const idUsuarioValentin = '8GWJpR3XAnWY4uZW87CDsMSDbRD3';
+        const idUsuarioSofia = 'jcyKJTaWuKTc2Kb51Zbj7q5yPr62';
+
+        idUsuario = (idPersonaActiva === 'valentin' ? idUsuarioValentin : idUsuarioSofia) || autenticacion.currentUser?.uid;
+
+        inicioSemanaActual = obtenerInicioSemana(new Date());
+        configurarNavegacionSemana();
+        configurarBotonesPersona();
+        configurarManejadoresResumen();
+        
+        window.deleteLogItem = eliminarItemLog;
+        
+    } catch (error) {
+        console.error("Error al inicializar Firebase:", error);
+        elementos.mensajeCoach.textContent = `Error de conexión: ${error.message}`;
+        elementos.indicadorCarga.style.display = 'none';
+    }
+}
+
+// ============================================================================
+// === NAVEGACIÓN: SEMANAS Y DÍAS ===
+// ============================================================================
+
+function configurarNavegacionSemana() {
+    elementos.botonSemanaPrev.addEventListener('click', () => cambiarSemana(-7));
+    elementos.botonSemanaSig.addEventListener('click', () => cambiarSemana(7));
+    
+    actualizarInterfazSemana();
+    configurarListenerTiempoReal();
+}
+
+function cambiarSemana(dias) {
+    inicioSemanaActual.setDate(inicioSemanaActual.getDate() + dias);
+    
+    const ahora = new Date();
+    const fechaInicioSemanaActual = obtenerInicioSemana(inicioSemanaActual);
+    const fechaInicioSemanaHoy = obtenerInicioSemana(ahora);
+
+    elementos.botonSemanaSig.disabled = (fechaInicioSemanaActual.toDateString() === fechaInicioSemanaHoy.toDateString());
+
+    if (inicioSemanaActual > obtenerInicioSemana(new Date())) {
+        inicioSemanaActual = obtenerInicioSemana(new Date());
+        elementos.botonSemanaSig.disabled = true;
+    }
+    
+    const diasSemana = obtenerDiasSemanaISO(inicioSemanaActual);
+    if (!diasSemana.includes(diaSeleccionado)) {
+        diaSeleccionado = diasSemana[0];
+    }
+
+    actualizarInterfazSemana();
+    configurarListenerTiempoReal();
+}
+
+function actualizarInterfazSemana() {
+    const diasSemana = obtenerDiasSemanaISO(inicioSemanaActual);
+    const finDeSemana = new Date(inicioSemanaActual);
+    finDeSemana.setDate(inicioSemanaActual.getDate() + 6);
+
+    const inicioRango = formatearFecha(diasSemana[0]);
+    const finRango = formatearFecha(diasSemana[6]);
+    elementos.textoRangoSemana.textContent = `${inicioRango} - ${finRango}`;
+
+    elementos.contenedorSelectorDias.innerHTML = '';
+    diasSemana.forEach(fechaISO => {
+        const nombreDia = obtenerNombreDiaCorto(fechaISO);
+        const parteFecha = formatearFecha(fechaISO);
+        
+        const estaSeleccionado = fechaISO === diaSeleccionado;
+        const esHoy = fechaISO === obtenerFechaLocalISO();
+        
+        const boton = document.createElement('button');
+        boton.className = `day-selector-btn ${estaSeleccionado ? 'active-day' : ''} ${esHoy ? 'today-marker' : ''}`;
+        
+        boton.innerHTML = `
+            <span class="day-name">${nombreDia}</span>
+            <span class="day-date">${parteFecha.split(' ')[0]}</span>
+        `;
+        boton.dataset.date = fechaISO;
+        boton.setAttribute('aria-label', `${nombreDia} ${parteFecha}`);
+        
+        boton.addEventListener('click', () => seleccionarDia(fechaISO));
+        elementos.contenedorSelectorDias.appendChild(boton);
+    });
+    
+    renderizarDiaSeleccionado();
+}
+
+function seleccionarDia(fechaISO) {
+    if (diaSeleccionado === fechaISO) return;
+    diaSeleccionado = fechaISO;
+    
+    document.querySelectorAll('.day-selector-btn').forEach(btn => {
+        btn.classList.remove('active-day');
+        if (btn.dataset.date === fechaISO) {
+            btn.classList.add('active-day');
+        }
+    });
+
+    renderizarDiaSeleccionado();
+}
+
+// ============================================================================
+// === FIRESTORE: LISTENER Y SINCRONIZACIÓN ===
+// ============================================================================
+
+function configurarListenerTiempoReal() {
+    if (Array.isArray(desuscripcionesLog)) {
+        desuscripcionesLog.forEach(desuscribir => desuscribir());
+    }
+    desuscripcionesLog = [];
+    datosSemana = {};
+
+    elementos.indicadorCarga.style.display = 'block';
+    elementos.contenidoPrincipal.style.display = 'none';
+
+    const diasSemanaISO = obtenerDiasSemanaISO(inicioSemanaActual);
+    
+    const datosIniciales = {
+        consumido: 0,
+        gastado: 0,
+        log_consumido: [],
+        log_gastado: []
+    };
+
+    diasSemanaISO.forEach(fechaISO => {
+        const refDoc = obtenerReferenciaDocumentoDiario(fechaISO);
+        
+        const desuscribir = onSnapshot(refDoc, (docSnap) => {
+            let datos = datosIniciales;
+
+            if (docSnap.exists()) {
+                datos = docSnap.data();
+            } else {
+                setDoc(refDoc, datosIniciales);
+            }
+            
+            datosSemana[fechaISO] = datos;
+            actualizarInterfazResumenSemanal();
+            
+            if (fechaISO === diaSeleccionado) {
+                renderizarDiaSeleccionado();
+            }
+        }, (error) => {
+            console.error(`Error en listener para ${fechaISO}:`, error);
+        });
+        
+        desuscripcionesLog.push(desuscribir);
+    });
+}
+
+// ============================================================================
+// === RENDERIZADO: RESÚMENES Y LOG ===
+// ============================================================================
+
+function actualizarInterfazUsuarioActivo() {
+    elementos.nombreUsuarioActivo.textContent = nombrePersonaActiva;
+    elementos.textoUsuarioLogVacio.textContent = nombrePersonaActiva;
+}
+
+function actualizarInterfazResumenSemanal() {
+    let totalConsumido = 0;
+    let totalGastado = 0;
+    
+    for (const fechaISO in datosSemana) {
+        totalConsumido += datosSemana[fechaISO].consumido || 0;
+        totalGastado += datosSemana[fechaISO].gastado || 0;
+    }
+    
+    const balanceNeto = Number((totalConsumido - totalGastado).toFixed(2));
+
+    elementos.totalConsumidoSemana.textContent = totalConsumido;
+    elementos.totalGastadoSemana.textContent = totalGastado;
+    elementos.balanceNetoSemana.textContent = balanceNeto;
+    
+    let estiloFondo = 'linear-gradient(135deg, #007aff 0%, #5ac8fa 100%)';
+    if (balanceNeto > 1000) {
+        estiloFondo = 'linear-gradient(135deg, #ff9500 0%, #ff3b30 100%)';
+    } else if (balanceNeto < -1000) {
+        estiloFondo = 'linear-gradient(135deg, #34c759 0%, #30d158 100%)';
+    }
+    elementos.cajaBalanceNetoSemana.style.background = estiloFondo;
+}
+
+async function renderizarDiaSeleccionado() {
+    const datos = datosSemana[diaSeleccionado] || {
+        consumido: 0,
+        gastado: 0,
+        log_consumido: [],
+        log_gastado: []
+    };
+    
+    datosLogActual = datos;
+
+    const perfilUsuarioActual = perfilesUsuario[idPersonaActiva];
+
+    const macrosDiarias = calcularMacrosDiarios(datosLogActual.log_consumido);
+    renderizarMacronutrientes(macrosDiarias);
+    
+    if (perfilUsuarioActual) {
+        const metas = calcularMetasDiarias(
+            perfilUsuarioActual, 
+            macrosDiarias, 
+            datosLogActual.consumido || 0
+        );
+        renderizarProgresoMetas(metas);
+    }
+
+    const esHoy = diaSeleccionado === obtenerFechaLocalISO();
+    
+    const fechaSeleccionada = new Date(diaSeleccionado + 'T00:00:00');
+    const hoy = new Date(obtenerFechaLocalISO() + 'T00:00:00');
+    const esDiaFuturo = fechaSeleccionada > hoy;
+    
+    elementos.textoDelDiaSeleccionado.textContent = esHoy ? "Hoy" : formatearFecha(diaSeleccionado);
+    elementos.fechaActualMostrada.textContent = diaSeleccionado;
+
+    const formularios = [elementos.formularioConsumo, elementos.formularioGasto];
+    const inputs = [elementos.inputDescripcionConsumo, elementos.inputDescripcionGasto];
+    const botones = [elementos.botonEnviarConsumo, elementos.botonEnviarGasto];
+
+    if (esDiaFuturo) {
+        formularios.forEach(form => form.style.opacity = '0.5');
+        inputs.forEach(input => {
+            input.disabled = true;
+            input.placeholder = "No se puede registrar en días futuros";
+        });
+        botones.forEach(btn => btn.disabled = true);
+    } else {
+        formularios.forEach(form => form.style.opacity = '1');
+        inputs.forEach(input => {
+            input.disabled = false;
+            input.placeholder = input.id.includes('Consumo') 
+                ? "Ej: 1 huevo hervido" 
+                : "Ej: 30 min de correr";
+        });
+        botones.forEach(btn => btn.disabled = false);
+    }
+
+    const consumido = datos.consumido || 0;
+    const gastado = datos.gastado || 0;
+    const balanceNeto = Number((consumido - gastado).toFixed(2));
+
+    elementos.textoTotalConsumido.textContent = consumido;
+    elementos.textoTotalGastado.textContent = gastado;
+    elementos.textoBalanceNeto.textContent = balanceNeto;
+
+    renderizarLogCombinado(datos.log_consumido, datos.log_gastado);
+
+    elementos.indicadorCarga.style.display = 'none';
+    elementos.contenidoPrincipal.style.display = 'block';
+
+    if (consumido === 0 && gastado === 0) {
+        elementos.mensajeCoach.textContent = `No hay registros para ${esHoy ? 'hoy' : formatearFecha(diaSeleccionado)}.`;
+    } else if (perfilUsuarioActual) {
+        elementos.mensajeCoach.innerHTML = `
+            <div class="text-center">
+                <p class="mb-3">📊 Hay registros para ${esHoy ? 'hoy' : formatearFecha(diaSeleccionado)}</p>
+                <button id="generateCoachBtn" class="btn btn-primary">
+                    <i class="fas fa-robot me-2"></i>Generar Análisis del Coach
+                </button>
+            </div>
+        `;
+        
+        setTimeout(() => {
+            const btnGenerar = document.getElementById('generateCoachBtn');
+            if (btnGenerar) {
+                btnGenerar.addEventListener('click', () => {
+                    generarAnalisisCoach(diaSeleccionado, consumido, gastado, perfilUsuarioActual, esHoy, idUsuario);
+                });
+            }
+        }, 100);
+        
+    } else {
+        let mensaje = '';
+        if (balanceNeto > 500) {
+            mensaje = `⚠️ Balance alto: +${balanceNeto} Kcal.`;
+        } else if (balanceNeto <= 0 && balanceNeto > -500) {
+            mensaje = `✅ Balance equilibrado: ${balanceNeto} Kcal.`;
+        } else if (balanceNeto <= -500) {
+            mensaje = `💪 Déficit importante: ${balanceNeto} Kcal.`;
+        } else {
+            mensaje = `Balance del día: ${balanceNeto > 0 ? '+' : ''}${balanceNeto} Kcal.`;
+        }
+        elementos.mensajeCoach.textContent = mensaje;
+    }
+}
+
+function renderizarLogCombinado(logConsumido, logGastado) {
+    elementos.logComidas.innerHTML = '';
+    
+    const logCombinado = [
+        ...(logConsumido || []).map(item => ({
+            ...item,
+            tipo: 'consumo',
+            claveOrden: new Date(item.hora).getTime()
+        })),
+        ...(logGastado || []).map(item => ({
+            ...item,
+            tipo: 'gasto',
+            claveOrden: new Date(item.hora
