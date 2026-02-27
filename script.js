@@ -91,8 +91,6 @@ if (!isCanvasEnvironment && GEMINI_API_KEYS.length > 0) {
     API_KEY = null; // En Canvas usaremos otra lógica
 }
 // Opción más recomendada y rápida
-// const MODEL_NAME = "gemini-2.5-flash"; //"gemini-2.5-flash-lite"; 
-// const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent`;
 
 const GEMINI_MODELS = [
     "gemini-2.5-flash-lite",  // 🥇 más rápida, arrancar acá
@@ -373,7 +371,7 @@ const elements = {
     modalTotalValue: document.getElementById('modalTotalValue'),
 };
 
-elements.loadingIndicator.style.display = 'block';
+elements.loadingIndicator.style.display = 'fixed';
 elements.summaryContent.style.display = 'none';
 
 // ==============================================================================
@@ -552,7 +550,7 @@ function setupRealtimeListener() {
     unsubscribeFromLog = [];
     weekData = {};
 
-    elements.loadingIndicator.style.display = 'block';
+    elements.loadingIndicator.style.display = 'fixed';
     elements.summaryContent.style.display = 'none';
 
     const weekDaysISO = getWeekDaysISO(currentWeekStart);
@@ -1690,9 +1688,6 @@ async function renderSelectedDay() {
     // ✅ RENDERIZAR INMEDIATAMENTE el log
     renderCombinedLog(data.log_consumido, data.log_gastado);
 
-    // ✅ MOSTRAR LA UI INMEDIATAMENTE
-    elements.loadingIndicator.style.display = 'none';
-    elements.summaryContent.style.display = 'block';
 
     // // Generar mensaje del coach de forma asíncrona (NO bloqueante)
     if (consumed === 0 && expended === 0) {
@@ -1719,6 +1714,7 @@ async function renderSelectedDay() {
                 });
             }
         }, 100);
+
         
     } else {
         // Mensaje básico si no hay perfil configurado
@@ -1735,7 +1731,9 @@ async function renderSelectedDay() {
         elements.coachMessage.textContent = message;
         elements.coachButton.style.display = 'none';
     }
-   
+            // ✅ MOSTRAR LA UI INMEDIATAMENTE
+        elements.loadingIndicator.style.display = 'none';
+        elements.summaryContent.style.display = 'block';
 }
 
 
