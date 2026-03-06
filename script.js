@@ -19,7 +19,7 @@ import {
     GEMINI_API_KEYS,  // Cambia esto
     RATE_LIMIT_CONFIG, // Añade esto
     APP_PROJECT_ID 
-} from './config.js';
+} from './modulos/config.js';
 
 // ==============================================================================
 // === SISTEMA DE GESTIÓN DE API KEYS ===
@@ -302,74 +302,6 @@ const perfilUsuario = {
 let activePersonId = PEOPLE[0].id;
 let activePersonName = PEOPLE[0].name;
 
-// Mapeo de elementos del DOM
-const elements = {
-    loadingIndicator: document.getElementById('loadingIndicator'),
-    activeUserName: document.getElementById('activeUserName'),
-    selectedDayDisplay: document.getElementById('selectedDayDisplay'),
-    currentDateDisplay: document.getElementById('currentDateDisplay'),
-
-    // Navegación Semanal
-    prevWeekBtn: document.getElementById('prevWeekBtn'),
-    nextWeekBtn: document.getElementById('nextWeekBtn'),
-    weekRangeDisplay: document.getElementById('weekRangeDisplay'),
-    daySelectorContainer: document.getElementById('daySelectorContainer'),
-    
-    // Resumen Semanal
-    totalConsumidoSemana: document.getElementById('totalConsumidoSemana'),
-    totalGastadoSemana: document.getElementById('totalGastadoSemana'),
-    netBalanceSemana: document.getElementById('netBalanceSemana'),
-    balanceNetoSemanaBox: document.getElementById('balanceNetoSemanaBox'),
-
-    // Inputs
-    apiConsumoLoading: document.getElementById('apiConsumoLoading'),
-    submitConsumoButton: document.getElementById('submitConsumoButton'),
-    registroConsumoForm: document.getElementById('registroConsumoForm'),
-    descripcionConsumo: document.getElementById('descripcionConsumo'),
-    apiGastoLoading: document.getElementById('apiGastoLoading'),
-    submitGastoButton: document.getElementById('submitGastoButton'),
-    registroGastoForm: document.getElementById('registroGastoForm'),
-    descripcionGasto: document.getElementById('descripcionGasto'),
-    
-    // Resumen Diario
-    consumidoBox: document.getElementById('consumidoBox'),
-    gastadoBox: document.getElementById('gastadoBox'),
-    totalConsumido: document.getElementById('totalConsumido'),
-    totalGastado: document.getElementById('totalGastado'),
-    netBalance: document.getElementById('netBalance'),
-    balanceNetoBox: document.getElementById('balanceNetoBox'),
-    coachMessage: document.getElementById('coachMessage'),
-    coachButton: document.getElementById('coachButton'),
-    foodLog: document.getElementById('foodLog'),
-    emptyLogMessage: document.getElementById('emptyLogMessage'),
-    emptyLogUser: document.getElementById('emptyLogUser'),
-    summaryContent: document.getElementById('summaryContent'),
-    selectValentinBtn: document.getElementById('selectValentinBtn'),
-    selectSofiaBtn: document.getElementById('selectSofiaBtn'),
-
-    // --- NUEVOS ELEMENTOS PARA MACROS DIARIOS ---
-    proteinasDiaDisplay: document.getElementById('proteinasDia'),
-    carbohidratosDiaDisplay: document.getElementById('carbohidratosDia'),
-    grasasDiaDisplay: document.getElementById('grasasDia'),
-    fibraDiaDisplay: document.getElementById('fibraDia'),
-    ultraprocesadosDiaDisplay: document.getElementById('ultraprocesadosDia'),
-    
-    // --- NUEVOS ELEMENTOS PARA METAS DIARIAS (Progreso) ---
-    proteinaProgress: document.getElementById('proteinaProgress'),
-    carbohidratosProgress: document.getElementById('carbohidratosProgress'),
-    grasasProgress: document.getElementById('grasasProgress'),
-    fibraProgress: document.getElementById('fibraProgress'),
-    kcalTargetProgress: document.getElementById('kcalTargetProgress'), // Muestra Consumido / Objetivo
-    kcalRestanteDisplay: document.getElementById('kcalRestanteDisplay'), // Opcional, para el feedback extra
-    
-    
-    // Modal
-    logDetailsModal: new bootstrap.Modal(document.getElementById('logDetailsModal')),
-    logDetailsModalTitle: document.getElementById('logDetailsModalLabel'),
-    modalLogContent: document.getElementById('modalLogContent'),
-    modalTotalLabel: document.getElementById('modalTotalLabel'),
-    modalTotalValue: document.getElementById('modalTotalValue'),
-};
 
 elements.loadingIndicator.style.display = 'fixed';
 elements.summaryContent.style.display = 'none';
@@ -869,181 +801,6 @@ async function obtenerUltimoAnalisis(userId, dayISO) {
     
     return "";
 }
-// /**
-//  * Genera el mensaje personalizado del coach nutricional basándose en el estado del día.
-//  * @param {number} consumido - Kcal totales consumidas.
-//  * @param {number} gastado - Kcal gastadas por ejercicio.
-//  * @param {Object} perfilUsuario - Objeto con el perfil y metas del usuario.
-//  * @param {string} momentOfDay - Indica el momento del análisis ('desayuno', 'almuerzo', 'merienda/entreno', 'final').
-//  * @param {string} [contextoPrevio=''] - Mensaje del análisis anterior para seguimiento (para el ítem 10).
-//  * @returns {Promise<string>} Mensaje del coach.
-//  */
-// async function generarMensajeCoach(consumido, gastado, perfilUsuario, momentOfDay, contextoPrevio = "") {
-//     const balance = consumido - gastado;
-//     const deficit_esperado = perfilUsuario.tdee - perfilUsuario.calorias_objetivo;
-//     const deficit_real = perfilUsuario.tdee - balance;
-
-//     const data = weekData[selectedDay] || {
-//         consumido: 0,
-//         gastado: 0,
-//         log_consumido: [],
-//         log_gastado: []
-//     };
-    
-//     currentLogData = data;
-
-//     const { 
-//         proteinas_dia, 
-//         carbohidratos_dia, 
-//         grasas_dia, 
-//         fibra_dia, 
-//         ultraprocesados_dia 
-//     } = calcularMacrosDia(currentLogData.log_consumido);
-
-//     // --- Lógica del Prompt Dinámico ---
-//     let analysisInstructions = "";
-//     let analysisTone = "";
-//     const metasKcal = perfilUsuario.calorias_objetivo;
-
-//     // 11. Tono y enfoque basado en el momento del día
-//     switch (momentOfDay) {
-//         case 'Desayuno':
-//             analysisTone = "Tono: Proactivo y optimista. Enfócate en el combustible para la mañana. El análisis es 'Parcial'.";
-//             analysisInstructions = `
-//                 1. Evalúa el aporte de <strong>Proteínas</strong> y <strong>Fibra</strong> del desayuno en relación a la meta de saciedad del día.
-//                 2. Sugiere la estrategia de ingesta para las próximas horas (media mañana o almuerzo), enfocándose en mantener el <strong>déficit bajo control</strong>.
-//                 3. Proporciona una recomendación de hidratación y manejo de ansiedad para la mañana.
-//                 4. **Corrección Urgente:** Si el desayuno es muy bajo en proteínas (menos de 20g), sugiere una adición inmediata.
-//             `;
-//             break;
-            
-//         case 'Almuerzo':
-//             analysisTone = "Tono: Control de mitad de jornada. Evalúa el cumplimiento calórico y de macros de la mañana. El análisis es 'Parcial'.";
-//             analysisInstructions = `
-//                 1. Evalúa el porcentaje de <strong>macros</strong> y calorías consumidas hasta el mediodía (debe ser aproximadamente el 40-50% de la meta total de ${metasKcal} Kcal).
-//                 2. Si hay un gran desvío, sugiere una <strong>corrección estratégica</strong> en la merienda/cena.
-//                 3. **Análisis Profunda:** Evalúa la calidad nutricional del almuerzo, usando las preferencias alimentarias del usuario para sugerir opciones de snacks o correcciones de la tarde.
-//                 4. Si el usuario entrena por la tarde (${perfilUsuario.fitness.horario_entrenamiento}), establece la estrategia nutricional Pre-entrenamiento (Carbohidratos 40-60 mins antes).
-//             `;
-//             break;
-            
-//         case 'Merienda':
-//             analysisTone = "Tono: Estratégico y de recuperación. Enfócate en la ventana pre/post-entrenamiento. El análisis es 'Parcial'.";
-//             analysisInstructions = `
-//                 1. Evalúa la adecuación del <strong>timing nutricional</strong> pre-entrenamiento. ¿Hubo suficientes carbohidratos de fácil digestión para el entrenamiento de ${perfilUsuario.fitness.tipo_entrenamiento}?
-//                 2. Proporciona una estrategia de recuperación <strong>Post-entrenamiento</strong> (Proteína + Carbohidratos) para la cena.
-//                 3. **Déficit Inminente:** Si el déficit calórico es muy alto antes de la cena, advierte el riesgo de comer en exceso y sugiere un ajuste en la cena.
-//                 4. Evalúa la ingesta de <strong>Proteínas totales</strong> y la necesidad de un aporte proteico significativo en la cena para alcanzar la meta.
-//             `;
-//             break;
-            
-//         case 'Cena':
-//         default:
-//             analysisTone = "Tono: Retrospectivo, enfocado en la sostenibilidad, la recuperación y la planificación del día siguiente. El análisis es 'Final'.";
-//             analysisInstructions = `
-//                 1. Evalúa el cumplimiento final del <strong>objetivo calórico</strong> y de <strong>Proteínas totales</strong> del día.
-//                 2. **Evaluación Profunda:** Analiza la distribución final de macros, la ingesta de <strong>Fibra</strong> (${fibra_dia} g) y la calidad nutricional (cantidad de <strong>Ultraprocesados</strong>).
-//                 3. Proporciona una recomendación clave para la <strong>planificación y descanso</strong> del día siguiente, en relación a su nivel de estrés (${perfilUsuario.salud_y_sostenibilidad.nivel_estres_dia}/10) y hora de sueño.
-//                 4. Sugiere un plato o ingrediente de la lista de favoritos que hubiera ayudado a mejorar la composición del día.
-//             `;
-//             break;
-//     }
-    
-//     // 10. Punto de control si hay feedback previo
-//     const contextItem = contextoPrevio ? `
-//         1. PUNTO DE CONTROL: ¿Se implementaron las sugerencias o correcciones dadas en el análisis anterior?
-//         CONTEXTO PREVIO: ${contextoPrevio}
-//     ` : '';
-
-//     // --- Definición del System Prompt (Sigue siendo la base) ---
-//     const systemPrompt = `Actúa como un nutricionista y coach personal profesional, especializado en nutrición basada en evidencia, guías internacionales (EFSA, FDA, ISSN) y el enfoque práctico del nutricionista Francis Holway.
-// Tu prioridad es generar recomendaciones científicamente válidas y personalizadas, evitando mitos, exageraciones y cualquier afirmación sin respaldo empírico.
-
-// PERFIL DEL USUARIO:
-// - Nombre: ${activePersonName}
-// - Objetivo calórico: ${perfilUsuario.calorias_objetivo} kcal/día | Meta: ${perfilUsuario.objetivo} a ${perfilUsuario.ritmo_semanal} kg/semana
-// - Rango Proteína Objetivo: ${perfilUsuario.proteina_min}g - ${perfilUsuario.proteina_max}g
-// - Rango Carbos Objetivo: ${perfilUsuario.carbos_rango_porcentaje} | Rango Grasas Objetivo: ${perfilUsuario.grasas_rango_porcentaje}
-// - Tiempo libre cocina: ${perfilUsuario.salud_y_sostenibilidad.tiempo_libre_cocina_semanal}
-// - Entrenamiento: ${perfilUsuario.fitness.tipo_entrenamiento} - ${perfilUsuario.fitness.horario_entrenamiento}
-
-// DATOS DEL DÍA (hasta ahora):
-// - Calorías consumidas: ${consumido} kcal
-// - Calorías gastadas (ejercicio): ${gastado} kcal
-// - Calorías Netas (Consumo - Gasto Ejercicio): ${balance} kcal
-// - **Déficit Real (vs TDEE): ${deficit_real} kcal** - Déficit esperado: ${deficit_esperado} kcal
-
-// MACRONUTRIENTES Y CALIDAD:
-// - Proteínas ingeridas: ${proteinas_dia} g
-// - Carbohidratos ingeridos: ${carbohidratos_dia} g
-// - Grasas ingeridas: ${grasas_dia} g
-// - Fibra ingerida: ${fibra_dia} g
-// - Alimentos ultraprocesados: ${ultraprocesados_dia}
-// - Preferencias Alimentarias Favoritas: ${Object.values(perfilUsuario.preferencias_alimentarias).flat().join(', ')}
-
-// REGLAS DE RESPUESTA (muy importantes):
-// - Utiliza únicamente afirmaciones consistentes con evidencia científica.
-// - No inventes datos fisiológicos ni valores nutricionales.
-// - Sé preciso, directo y orientado a decisiones accionables.
-// - Evita lenguaje alarmista; prioriza la claridad y la adherencia.
-// - Mantén un tono profesional, motivador y equilibrado.`;
-
-//     // --- Definición del User Query (Instrucciones) ---
-//     const userQuery = `ANÁLISIS NUTRICIONAL - ${momentOfDay.toUpperCase()}
-// ## FORMATO OBLIGATORIO (NO NEGOCIABLE):
-// - Debes responder con EXACTAMENTE 6 ítems numerados (1. a 6.)
-// - Cada ítem debe tener entre 2 y 4 oraciones
-// - Usa 1 emoji relevante al inicio de cada ítem
-// - Destaca métricas importantes con **negritas** (NO uses <strong>)
-// - Separa cada ítem numerado con un salto de línea HTML.
-//     
-// ## TEMAS DE LOS 6 ÍTEMS (OBLIGATORIOS):
-//         
-// <1. 🟢 **Evaluación Calórica y Adherencia:** Evalúa el Déficit Real (${deficit_real} kcal) comparado con el Déficit Esperado (${deficit_esperado} kcal).
-// 2. 💪 **Revisión de Proteínas:** Evalúa si ${proteinas_dia} g están dentro del rango objetivo (${perfilUsuario.proteina_min}g - ${perfilUsuario.proteina_max}g) y su impacto en la <strong>Definición</strong>.
-// 3. ⏱️ **Timing Nutricional (Pre/Post-Entreno):** Analiza la distribución de carbohidratos alrededor del horario de entrenamiento (${perfilUsuario.fitness.horario_entrenamiento}) y cómo afecta el rendimiento (Si es que ese dia entrenó, si no evalualo desde otra mirada).
-// 4. 🥕 **Fibra y Calidad Nutricional:** Evalúa la ingesta de <strong>Fibra</strong> (${fibra_dia} g) y la cantidad de <strong>Ultraprocesados</strong>, ofreciendo consejos de saciedad.
-// 5. 🧭 **Ajuste Prioritario y Recomendación:** Sugiere la corrección más urgente para el día siguiente o la recomendación más importante. Menciona un plato o ingrediente de las preferencias alimentarias (${Object.values(perfilUsuario.preferencias_alimentarias).flat().join(', ').substring(0, 100)}...) que lo facilite.
-// 6. 💤 **Recuperación y Planificación:** Conecta la nutrición con el nivel de estrés (${perfilUsuario.salud_y_sostenibilidad.nivel_estres_dia}/10) y la <strong>planificación de la cena</strong> o el desayuno de mañana.
-
-// ## ENFOQUE ESPECÍFICO PARA ${momentOfDay}:
-// ${analysisInstructions}
-
-// ${contextItem ? `## CONTEXTO PREVIO:
-// Considera si se implementó: "${contextoPrevio}"` : ''}
-
-// ## TONO:
-// ${analysisTone}
-
-// `;
-//     console.log(systemPrompt)
-//     console.log(userQuery)
-
-//     let intentos = 0;
-//     let mensaje = "";
-    
-//     while (intentos < 3) {
-//         mensaje = await fetchGeminiCoachMessage(systemPrompt, userQuery);
-        
-//         // Validar que la respuesta tenga al menos 6 ítems
-//         const itemCount = (mensaje.match(/\d\.\s/g) || []).length;
-//         const lineas = mensaje.split('\n').filter(l => l.trim().length > 0);
-        
-//         if (itemCount >= 6 && lineas.length >= 8) {
-//             return mensaje;
-//         }
-        
-//         // Si es corto, regenerar con instrucciones más claras
-//         intentos++;
-        
-//         if (intentos < 3) {
-//             userQuery += "\n\n⚠️ IMPORTANTE: Tu respuesta anterior fue muy corta. Asegúrate de generar EXACTAMENTE 6 ítems numerados, cada uno con 2-4 oraciones completas.";
-//         }
-//     }
-
-//     const macros = calcularMacrosDia(data.log_consumido);
-//     return generarMensajeFallback(consumido, gastado, perfilUsuario, momentOfDay, macros);
-// }
 
 
 /**
@@ -1499,8 +1256,6 @@ async function generateCoachAnalysis(selectedDay, consumed, expended, perfilUsua
     }
 }
 
-
-
 /**
  * Muestra un diálogo de confirmación personalizado para análisis
  * @param {string} type - "new" o "existing"
@@ -1607,8 +1362,6 @@ function showBasicAnalysis(consumed, expended) {
         }
     }, 100);
 }
-
-
 
 // --- Renderizado de Log ---
 async function renderSelectedDay() {
@@ -1736,7 +1489,6 @@ async function renderSelectedDay() {
         elements.summaryContent.style.display = 'block';
 }
 
-
 const MEAL_TIMES = {
     DESAYUNO: { start: 6, end: 12 },
     ALMUERZO: { start: 12, end: 14.50 },
@@ -1760,7 +1512,6 @@ function getMealCategory(dateObj) {
         return 'Colación';
     }
 }
-
 
 function renderCombinedLog(logConsumed, logExpended) {
     elements.foodLog.innerHTML = '';
@@ -1895,7 +1646,6 @@ async function deleteLogItem(type, itemId, kcalValue) {
 }
 
 // --- Modal de Detalles ---
-
 function showLogDetails(type) {
     const isConsumption = type === 'consumo';
     const log = isConsumption ? currentLogData.log_consumido : currentLogData.log_gastado;
