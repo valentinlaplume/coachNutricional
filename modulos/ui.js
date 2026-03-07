@@ -175,10 +175,10 @@ export function renderCombinedLog(logConsumed, logExpended) {
 
         // 3. CONSTRUCCIÓN DEL CARD
         const listItem = document.createElement('div');
-        listItem.className = 'animate-in mb-3';
+        listItem.className = 'animate-in';
         listItem.innerHTML = `
             <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
-                <div class="card-body p-3">
+                <div class="card-body p-2">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div class="min-w-0">
                             <span class="badge ${isConsumption ? 'bg-primary-subtle text-primary' : 'bg-danger-subtle text-danger'} text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">

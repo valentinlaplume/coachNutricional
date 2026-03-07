@@ -8,77 +8,186 @@ let selectedRecipe = null;
 export function getStagingComidas() { return stagingComidas; }
 export function clearStaging() { stagingComidas = []; renderStagingUI(); }
 
+
 // 1. Activa los botones de la interfaz principal para abrir el selector
 export function setupFiltrosUI() {
     const modalElement = document.getElementById('modalRecetas');
+    const inputBusqueda = document.getElementById('searchRecetas'); // El ID del nuevo input
     if (!modalElement) return;
+    
     const bsModal = new bootstrap.Modal(modalElement);
+    let filtroActivo = 'todos';
 
+    // --- FUNCIÓN AUXILIAR DE RENDERIZADO ---
+    const ejecutarFiltrado = () => {
+        const texto = inputBusqueda ? inputBusqueda.value.toLowerCase() : '';
+        renderRecetasGrid(misRecetas, filtroActivo, texto);
+    };
+
+    // 1. Eventos para los Botones de Filtro
     document.querySelectorAll('.btn-filtro-receta').forEach(boton => {
         boton.addEventListener('click', (e) => {
-            const filtro = e.currentTarget.dataset.filtro;
+            filtroActivo = e.currentTarget.dataset.filtro;
+            
+            // Actualizar UI del título
             document.getElementById('tituloModalRecetas').innerText = `Filtrar: ${e.currentTarget.innerText}`;
-            renderRecetasGrid(misRecetas, filtro);
+            
+            ejecutarFiltrado();
             bsModal.show();
         });
     });
-}
 
+    // 2. Evento para el Buscador (si existe en el DOM)
+    inputBusqueda?.addEventListener('input', () => {
+        ejecutarFiltrado();
+    });
+
+    // 3. Limpiar buscador al cerrar el modal (Opcional, para UX limpia)
+    modalElement.addEventListener('hidden.bs.modal', () => {
+        if (inputBusqueda) inputBusqueda.value = '';
+        filtroActivo = 'todos';
+    });
+}
 // 2. Dibuja la grilla de recetas dentro del modal
 // Dentro de tu archivo de recetas.js
-export function renderRecetasGrid(recetas, filtroTipo = 'todos') {
+export function renderRecetasGrid(recetas, filtroTipo = 'todos', busqueda = '') {
     const grid = document.getElementById('recetasGrid');
     if (!grid) return;
 
-    // 1. Limpiar el contenedor antes de renderizar
     grid.innerHTML = '';
 
-    // 2. Filtrado (aseguramos que 'recetas' no sea undefined)
     let filtradas = recetas || [];
     if (filtroTipo === 'alta-proteina') filtradas = recetas.filter(r => (r.proteinas || 0) >= 15);
     else if (filtroTipo === 'bebidas') filtradas = recetas.filter(r => r.unidad === 'ml');
     else if (filtroTipo === 'bajo-grasa') filtradas = recetas.filter(r => (r.grasas || 0) <= 5);
+    else if (filtroTipo === 'fibra') filtradas = recetas.filter(r => (r.fibra || 0) >= 5);
 
-    // 3. Generar HTML
-    const html = filtradas.map(receta => `
+    // 2. Filtrado por Texto (Buscador)
+    if (busqueda.trim() !== "") {
+        filtradas = filtradas.filter(r => 
+            r.nombre.toLowerCase().includes(busqueda.trim().toLowerCase())
+        );
+    }
+
+    const html = filtradas.map(receta => {
+        // Redondeamos para que la visualización sea limpia
+        const p = Math.round(receta.proteinas || 0);
+        const c = Math.round(receta.carbohidratos || 0);
+        const g = Math.round(receta.grasas || 0);
+        const f = Math.round(receta.fibra || 0);
+
+        return `
         <div class="col">
-            <div class="card border-0 shadow-sm p-3 h-100" 
-                 style="cursor: pointer; border-radius: 16px; background-color: #f8f9fa;" 
+            <div class="card border-0 shadow-sm h-100 recipe-card" 
                  onclick="window.openRecipeQtyModal('${receta.id}')"> 
-                <div class="fw-bold small text-dark mb-1">${receta.nombre}</div>
-                <div class="text-xs text-primary fw-bold">${receta.kcal} kcal</div>
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div class="fw-bold text-dark small text-truncate" style="max-width: 70%;">
+                            ${receta.nombre}
+                        </div>
+                        <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.7rem;">
+                            ${Math.round(receta.kcal)} kcal
+                        </span>
+                    </div>
+
+                    <div class="d-flex gap-1 mt-2 justify-content-between">
+                        <div class="macro-item text-center">
+                            <div class="text-muted" style="font-size: 0.6rem; text-transform: uppercase;">PROT</div>
+                            <div class="fw-bold text-primary" style="font-size: 0.75rem;">${p}g</div>
+                        </div>
+                        <div class="macro-item text-center">
+                            <div class="text-muted" style="font-size: 0.6rem; text-transform: uppercase;">CARBS</div>
+                            <div class="fw-bold text-warning" style="font-size: 0.75rem;">${c}g</div>
+                        </div>
+                        <div class="macro-item text-center">
+                            <div class="text-muted" style="font-size: 0.6rem; text-transform: uppercase;">GRASAS</div>
+                            <div class="fw-bold text-success" style="font-size: 0.75rem;">${g}g</div>
+                        </div>
+                         <div class="macro-item text-center">
+                            <div class="text-muted" style="font-size: 0.6rem; text-transform: uppercase;">FIBRA</div>
+                            <div class="fw-bold text-success" style="font-size: 0.75rem;">${f}g</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    `).join('');
+    `}).join('');
 
-    grid.innerHTML = html || '<p class="text-center w-100 small text-muted">No hay recetas.</p>';
+    grid.innerHTML = html || `
+        <div class="col-12 text-center p-5">
+            <i class="fas fa-utensils text-light mb-2" style="font-size: 2rem;"></i>
+            <p class="small text-muted">No se encontraron recetas.</p>
+        </div>`;
 }
-
-// 3. Abre el modal de cantidad
 window.openRecipeQtyModal = (id) => {
-    // 1. Buscar la receta en el estado global
     const receta = misRecetas.find(r => r.id === id);
     if (!receta) return;
     
     selectedRecipe = receta;
     
-    // 2. Rellenar los campos del segundo modal
+    // 1. Título y Unidad
     document.getElementById('modalRecipeTitle').innerText = receta.nombre;
-    document.getElementById('modalUnitLabel').innerText = receta.unidad || 'g';
-    document.getElementById('modalGramsInput').value = 100;
+    const unidadLarga = { 'g': 'gramos', 'ml': 'mililitros', 'unidad': 'unidades' };
+    const textoUnidad = unidadLarga[receta.unidad] || receta.unidad || 'gramos';
+    document.getElementById('modalUnitLabel').innerText = textoUnidad;
 
-    // 3. CAMBIO DE MODALES (Importante para evitar bugs de scroll)
-    const mRecetasEl = document.getElementById('modalRecetas');
-    const mQtyEl = document.getElementById('recipeModal');
-    
-    // Cerramos el de la grilla antes de abrir el de cantidad
-    const modalRecetasBS = bootstrap.Modal.getInstance(mRecetasEl);
+    // 2. Configurar Input
+    const inputGrams = document.getElementById('modalGramsInput');
+    inputGrams.value = 100; // Valor inicial por defecto
+    inputGrams.placeholder = `Cantidad en ${textoUnidad}`;
+
+    // 3. Función interna para calcular y mostrar macros
+    const actualizarVistaMacros = () => {
+        const cantidad = parseFloat(inputGrams.value) || 0;
+        // Fórmula: (Macro / 100) * cantidad
+        const kcal = Math.round((receta.kcal / 100) * cantidad);
+        const p = Math.round((receta.proteinas / 100) * cantidad);
+        const c = Math.round((receta.carbohidratos / 100) * cantidad);
+        const g = Math.round((receta.grasas / 100) * cantidad);
+
+        document.getElementById('recipeModalMacros').innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="badge bg-primary fs-6">${kcal} kcal</span>
+                <small class="text-muted">Macros para ${cantidad}${receta.unidad || 'g'}</small>
+            </div>
+            <div class="row g-2 text-center">
+                <div class="col-4">
+                    <div class="p-2 border rounded-3 bg-white">
+                        <div class="text-xs text-muted">Prot</div>
+                        <div class="fw-bold text-primary">${p}g</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="p-2 border rounded-3 bg-white">
+                        <div class="text-xs text-muted">Carb</div>
+                        <div class="fw-bold text-warning">${c}g</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="p-2 border rounded-3 bg-white">
+                        <div class="text-xs text-muted">Grasa</div>
+                        <div class="fw-bold text-success">${g}g</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    };
+
+    // 4. Escuchar cambios en el input (mientras escribe)
+    inputGrams.oninput = actualizarVistaMacros;
+
+    // 5. Render inicial (para los 100g por defecto)
+    actualizarVistaMacros();
+
+    // 6. Cambio de modales (Bootstrap logic)
+    const modalRecetasBS = bootstrap.Modal.getInstance(document.getElementById('modalRecetas'));
     if (modalRecetasBS) modalRecetasBS.hide();
 
-    // Pequeño delay para que el DOM respire y abra el nuevo modal limpiamente
     setTimeout(() => {
-        const modalQtyBS = new bootstrap.Modal(mQtyEl);
+        const modalQtyBS = new bootstrap.Modal(document.getElementById('recipeModal'));
         modalQtyBS.show();
+        // Foco automático para mejorar UX en el iPhone
+        setTimeout(() => inputGrams.focus(), 400);
     }, 150);
 };
 
@@ -190,11 +299,12 @@ document.getElementById('btnCalcularMacrosIA')?.addEventListener('click', async 
 
         if (datos) {
             // Rellenamos los inputs del modal automáticamente
-            document.getElementById('newRecKcal').value = datos.kcal;
-            document.getElementById('newRecProt').value = datos.proteinas;
-            document.getElementById('newRecCarb').value = datos.carbohidratos;
-            document.getElementById('newRecGrasa').value = datos.grasas;
-            document.getElementById('newRecFibra').value = datos.fibra || 0;
+            // Usamos Math.round() para que siempre sean números enteros
+            document.getElementById('newRecKcal').value = Math.round(datos.kcal || 0);
+            document.getElementById('newRecProt').value = Math.round(datos.proteinas || 0);
+            document.getElementById('newRecCarb').value = Math.round(datos.carbohidratos || 0);
+            document.getElementById('newRecGrasa').value = Math.round(datos.grasas || 0);
+            document.getElementById('newRecFibra').value = Math.round(datos.fibra || 0);
             
             // Feedback visual de éxito
             btn.innerHTML = '<i class="fas fa-sync me-1"></i> Recalcular';
@@ -281,6 +391,56 @@ window.verDetalleReceta = function(nombreReceta) {
     const modalInstance = new bootstrap.Modal(document.getElementById('modalDetalleReceta'));
     modalInstance.show();
 };
+
+
+// Trigger del botón al input oculto
+document.getElementById('btnCamaraIA')?.addEventListener('click', () => {
+    document.getElementById('inputCamaraNutricional').click();
+});
+
+// Cuando se selecciona/saca la foto
+document.getElementById('inputCamaraNutricional')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const loader = document.getElementById('loadingIA');
+    const status = document.getElementById('statusIA');
+    
+    try {
+        loader.classList.remove('d-none');
+        status.innerText = "Leyendo imagen...";
+
+        // 1. Convertir imagen a Base64
+        const base64Image = await toBase64(file);
+
+        // 2. Enviar a Gemini (necesitas ajustar tu función fetchGemini para aceptar imágenes)
+        const datos = await fetchGeminiFoodData("Informacion/Tabla nutricional de producto", base64Image);
+
+        if (datos) {
+            // 3. Rellenar los campos del modal mágicamente
+            // document.getElementById('newRecNombre').value = datos.nombre || "";
+            document.getElementById('newRecKcal').value = datos.kcal;
+            document.getElementById('newRecProt').value = datos.proteinas;
+            document.getElementById('newRecCarb').value = datos.carbohidratos;
+            document.getElementById('newRecGrasa').value = datos.grasas;
+            document.getElementById('newRecFibra').value = datos.fibra || 0;
+            status.innerText = "¡Listo!";
+        }
+    } catch (error) {
+        console.error("Error con la cámara:", error);
+        alert("No se pudo leer la tabla. Intenta con una foto más clara.");
+    } finally {
+        setTimeout(() => loader.classList.add('d-none'), 2000);
+    }
+});
+
+// Helper para convertir archivo a Base64
+const toBase64 = file => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = error => reject(error);
+});
 
 export async function inicializarUIComidas() {
     const recetasDesdeDB = await getCollection('recetas');

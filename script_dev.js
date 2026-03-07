@@ -137,62 +137,73 @@ elements.summaryContent.style.display = 'none';
 //         elements.submitConsumoButton.disabled = false;
 //     }
 // });
-
 elements.registroConsumoForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!currentUser) return;
 
-    const staging = getStagingComidas(); // [{id, nombre, cantidad, unidad, ...}]
+    const staging = getStagingComidas(); 
     const inputManual = elements.descripcionConsumo.value.trim();
 
     if (staging.length === 0 && inputManual.length < 3) return;
-
-    // Prompt para Gemini (igual que antes)
-    let promptFinal = staging.length > 0 
-        ? `DB: ${staging.map(i => `${i.nombre} ${i.cantidad}${i.unidad}`).join(", ")}. Manual: ${inputManual}` 
-        : inputManual;
 
     elements.submitConsumoButton.disabled = true;
     elements.apiConsumoLoading.style.display = 'flex';
 
     try {
-        const datos = await fetchGeminiFoodData(promptFinal);
-        if (!datos) return;
+        let totalMacros = { kcal: 0, proteinas: 0, carbohidratos: 0, grasas: 0, fibra: 0 };
 
+        // --- 1. PROCESAR STAGING (Matemática Pura) ---
+        staging.forEach(s => {
+            const factor = s.cantidad / 100;
+            totalMacros.kcal += Math.round((s.kcal || 0) * factor);
+            totalMacros.proteinas += Math.round((s.proteinas || 0) * factor);
+            totalMacros.carbohidratos += Math.round((s.carbohidratos || 0) * factor);
+            totalMacros.grasas += Math.round((s.grasas || 0) * factor);
+            totalMacros.fibra += Math.round((s.fibra || 0) * factor);
+        });
+
+        // --- 2. PROCESAR MANUAL (IA - Solo si hay texto) ---
+        if (inputManual.length >= 3) {
+            const datosIA = await fetchGeminiFoodData(inputManual);
+            if (datosIA) {
+                totalMacros.kcal += datosIA.kcal;
+                totalMacros.proteinas += datosIA.proteinas;
+                totalMacros.carbohidratos += datosIA.carbohidratos;
+                totalMacros.grasas += datosIA.grasas;
+                totalMacros.fibra += (datosIA.fibra || 0);
+            }
+        }
+
+        // --- 3. GUARDAR EN FIRESTORE ---
         const docRef = getDailyDocRef(selectedDay);
         const current = weekData[selectedDay] || { consumido: 0, log_consumido: [] };
 
         const nuevoItem = {
             id: crypto.randomUUID(),
             hora: new Date().toISOString(),
-            // --- DATOS PUROS ---
             recetasUsadas: staging.map(s => ({ 
                 nombre: s.nombre, 
                 cantidad: s.cantidad, 
                 unidad: s.unidad || 'g' 
             })),
             descripcionManual: inputManual,
-            // -------------------
-            kcal: datos.kcal,
-            proteinas: datos.proteinas,
-            carbohidratos: datos.carbohidratos,
-            grasas: datos.grasas,
-            fibra: datos.fibra || 0
+            // Guardamos los macros finales ya sumados
+            ...totalMacros 
         };
         
         await setDoc(docRef, {
-            consumido: (current.consumido || 0) + datos.kcal,
+            consumido: (current.consumido || 0) + totalMacros.kcal,
             log_consumido: (current.log_consumido || []).concat([nuevoItem])
         }, { merge: true });
-
 
         // 4. Limpieza de UI
         e.target.reset();
         clearStaging();
-        elements.coachMessage.textContent = `✅ +${datos.kcal} Kcal`;
+        elements.coachMessage.textContent = `✅ +${totalMacros.kcal} Kcal`;
 
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Error en registro:", error);
+        alert("Hubo un error al registrar. Revisa la consola.");
     } finally {
         elements.apiConsumoLoading.style.display = 'none';
         elements.submitConsumoButton.disabled = false;

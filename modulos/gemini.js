@@ -113,13 +113,23 @@ const EXPENDITURE_SCHEMA = {
     properties: { "kcal": { "type": "NUMBER" } },
     required: ["kcal"]
 };
-
 export async function sendGeminiRequest(systemPrompt, userQuery, responseSchema) {
+    // AJUSTE: Si userQuery ya es un array de partes (trae imagen), lo usamos. 
+    // Si es un string, lo envolvemos en el formato estándar de texto.
+    const userParts = Array.isArray(userQuery) 
+        ? userQuery 
+        : [{ text: userQuery }];
+
     const payload = {
-        contents: [{ role: "user", parts: [{ text: userQuery }] }],
+        contents: [{ role: "user", parts: userParts }],
         systemInstruction: { parts: [{ text: systemPrompt }] },
-        generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema }
+        generationConfig: { 
+            temperature: 0.2, 
+            responseMimeType: "application/json", 
+            responseSchema 
+        }
     };
+    
     const MAX_RETRIES = 3;
 
     for (let i = 0; i < MAX_RETRIES; i++) {
@@ -149,7 +159,10 @@ export async function sendGeminiRequest(systemPrompt, userQuery, responseSchema)
             const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!jsonText) throw new Error("Respuesta vacía de la API");
 
-            const parsed = JSON.parse(jsonText);
+            // Limpieza por si Gemini devuelve markdown (```json ...)
+            const cleanedJson = jsonText.replace(/```json|```/g, "").trim();
+            const parsed = JSON.parse(cleanedJson);
+            
             API_KEY.incrementRequest();
             return parsed;
 
@@ -161,14 +174,33 @@ export async function sendGeminiRequest(systemPrompt, userQuery, responseSchema)
     }
     throw new Error("Fallo en AI: Máximo de reintentos alcanzado");
 }
+export async function fetchGeminiFoodData(foodDescription, base64Image = null) {
+    const systemPrompt = `Eres un analizador experto de alimentos. 
+    REGLAS: 
+    1. Responde con JSON. Si hay imagen, y es una tabla de información nutricional, extrae datos de la tabla. Si no hay imagen, estima por la descripción. 
+    2. Devuelve los valores nutricionales POR CADA 100g.
+    3. Los valores de kcal, proteinas, carbohidratos, grasas y fibra deben ser NÚMEROS ENTEROS (sin decimales). 
+    4. Si el valor es menor a 0.5, pon 0. Si es mayor, redondea al entero más cercano.`;
 
-export async function fetchGeminiFoodData(foodDescription) {
-    const systemPrompt = `Eres un analizador experto de alimentos y nutrición basado en datos reales (USDA, FAO, BEDCA).
-Debes responder SIEMPRE con JSON válido y NADA fuera del JSON.
-REGLAS: No omitas campos. Si falta información, aproxima con valores realistas. Clasifica con NOVA si es casero. Usa porción estándar si no hay cantidad.`;
-    const rawResponse = await sendGeminiRequest(systemPrompt, `Analiza nutricionalmente: "${foodDescription}"`, FOOD_SCHEMA);
-    if (typeof rawResponse === "number") return { kcal: rawResponse, proteinas: 0, carbohidratos: 0, grasas: 0, fibra: 0, procesado: "desconocido" };
-    return rawResponse;
+    let userContent;
+
+    if (base64Image) {
+        // Formato Multimodal
+        userContent = [
+            { text: `Analiza esta tabla nutricional. Contexto extra: ${foodDescription}` },
+            {
+                inline_data: {
+                    mime_type: "image/jpeg",
+                    data: base64Image
+                }
+            }
+        ];
+    } else {
+        // Formato Texto Simple
+        userContent = `Analiza nutricionalmente: "${foodDescription}"`;
+    }
+
+    return await sendGeminiRequest(systemPrompt, userContent, FOOD_SCHEMA);
 }
 
 async function fetchGeminiExpenditure(activityDescription) {

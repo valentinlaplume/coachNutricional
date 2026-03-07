@@ -485,9 +485,11 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body text-center p-4">
-                <div class="display-6 fw-bold text-primary mb-1">
-                    <input type="number" id="modalGramsInput" class="form-control form-control-lg text-center border-0 fw-bold" 
-                           style="font-size: 2rem;" value="100">
+                <div id="recipeModalMacros" class="p-3 mb-3 bg-light rounded-4">
+                </div>
+                <div class="mb-3">
+                    <label id="modalUnitLabel" class="form-label small fw-bold text-secondary"></label>
+                    <input type="number" id="modalGramsInput" class="form-control form-control-lg rounded-pill border-primary text-center">
                 </div>
                 <p id="modalUnitLabel" class="text-muted text-uppercase small fw-bold">gramos</p>
                 <button type="button" class="btn btn-primary w-100 py-3 rounded-pill fw-bold" onclick="window.confirmRecipeAddition()">
@@ -505,8 +507,17 @@
                 <h6 class="modal-title fw-bold" id="tituloModalRecetas">Seleccionar Receta</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
+            <div class="mb-3 px-1">
+                <div class="input-group input-group-lg shadow-sm rounded-pill overflow-hidden border">
+                    <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" id="searchRecetas" class="form-control border-0" 
+                        placeholder="Buscar por nombre (ej: Pancake, Pollo...)" 
+                        style="font-size: 0.9rem; outline: none; box-shadow: none;">
+                </div>
+            </div>
+
             <div class="modal-body p-3">
-                <div class="row row-cols-2 g-2" id="recetasGrid"></div>
+                <div class="row row-cols-1 g-2" id="recetasGrid"></div>
             </div>
         </div>
     </div>
@@ -525,7 +536,7 @@
                         <label class="form-label small fw-bold text-secondary">Nombre de la receta</label>
                         <input type="text" class="form-control" id="newRecNombre" placeholder="Ej: Mezcla Maestra" required>
                     </div>
-                    <div class="mb-3">
+                    <!-- <div class="mb-3">
                         <label class="form-label small fw-bold text-secondary">Ingredientes (Descripción)</label>
                         <textarea class="form-control mb-2" id="newRecIngredientes" rows="3" 
                                 placeholder="Ej: 100g harina, 30g whey protein Star Nutrition..."></textarea>
@@ -536,27 +547,47 @@
                         <div id="loadingIA" class="text-center mt-2 d-none">
                             <div class="spinner-border spinner-border-sm text-primary"></div> <small>Analizando ingredientes...</small>
                         </div>
-                    </div>
+                    </div> -->
+                    <div class="mb-3">
+    <label class="form-label small fw-bold text-secondary">Ingredientes o Tabla Nutricional</label>
+    <div class="d-flex gap-2 mb-2">
+        <input type="file" id="inputCamaraNutricional" accept="image/*" capture="environment" class="d-none">
+        
+        <button type="button" id="btnCamaraIA" class="btn btn-outline-dark flex-grow-1 rounded-pill">
+            <i class="fas fa-camera me-1"></i> Foto a Tabla
+        </button>
+        
+        <button type="button" id="btnCalcularMacrosIA" class="btn btn-outline-primary flex-grow-1 rounded-pill">
+            <i class="fas fa-magic me-1"></i> IA Texto
+        </button>
+    </div>
+    
+    <textarea class="form-control mb-2" id="newRecIngredientes" rows="2" placeholder="O deja que la IA lea la foto..."></textarea>
+    
+    <div id="loadingIA" class="text-center mt-2 d-none">
+        <div class="spinner-border spinner-border-sm text-primary"></div> <small id="statusIA">Procesando...</small>
+    </div>
+</div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="form-label small fw-bold text-secondary">Kcal (por 100g)</label>
-                            <input type="number" class="form-control" id="newRecKcal" required>
+                            <input type="number" class="form-control" id="newRecKcal" step="1" required>
                         </div>
                         <div class="col-6">
                             <label class="form-label small fw-bold text-secondary">Proteína (g)</label>
-                            <input type="number" class="form-control" id="newRecProt" required>
+                            <input type="number" class="form-control" id="newRecProt" step="1" required>
                         </div>
                         <div class="col-4">
                             <label class="form-label small fw-bold text-secondary">Carbs</label>
-                            <input type="number" class="form-control" id="newRecCarb" required>
+                            <input type="number" class="form-control" id="newRecCarb" step="1" required>
                         </div>
                         <div class="col-4">
                             <label class="form-label small fw-bold text-secondary">Grasas</label>
-                            <input type="number" class="form-control" id="newRecGrasa" required>
+                            <input type="number" class="form-control" id="newRecGrasa" step="1" required>
                         </div>
                         <div class="col-4">
                             <label class="form-label small fw-bold text-secondary">Fibra</label>
-                            <input type="number" class="form-control" id="newRecFibra">
+                            <input type="number" class="form-control" id="newRecFibra" step="1" required>
                         </div>
                     </div>
                 </div>

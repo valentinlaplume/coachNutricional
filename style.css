@@ -729,3 +729,37 @@ body:not(.modal-open) .modal-backdrop {
 .modal-open {
     overflow: auto !important;
 }
+
+.recipe-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-radius: 18px !important;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.03) !important;
+}
+
+/* Efecto al presionar (Active State) */
+.recipe-card:active {
+    transform: scale(0.96);
+    background-color: #f1f3f5;
+}
+
+.macro-item {
+    background: #f8f9fa;
+    padding: 4px 8px;
+    border-radius: 10px;
+    flex: 1;
+}
+
+.text-xs {
+    font-size: 0.7rem;
+}
+
+/* Animación de entrada para que no aparezcan de golpe */
+.recipe-card {
+    animation: fadeInSlide 0.3s ease forwards;
+}
+
+@keyframes fadeInSlide {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
