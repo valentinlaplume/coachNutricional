@@ -11,7 +11,7 @@ const PLAN_LIMITS = {
 // ====================
 // Incorporar en plans.js
 // ====================
-function checkFeatureAccess(perfil, feature) {
+export function checkFeatureAccess(perfil, feature) {
     const plan = perfil.suscripcion?.plan || "free";
     const estado = perfil.suscripcion?.estado;
     const planEfectivo = estado === "trial" ? "pro" : plan;

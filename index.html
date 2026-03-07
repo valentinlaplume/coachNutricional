@@ -414,51 +414,160 @@
                         </button>
                         <div id="coachMessage" class="mt-3">No hay registros para hoy.</div>
                     </div>
+                    
+                    <!-- REGISTRAR RECETAS -->
+ <div class="row g-3 mb-3">
+    <div class="col-12 col-md-6">
+        <div class="card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="h6 text-dark m-0">
+                    <i class="fas fa-book-medical me-2 text-primary"></i>Recetas / Favoritas
+                </h6>
+                <button class="btn btn-sm btn-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNuevaReceta">
+                    <i class="fas fa-plus me-1"></i> Nueva
+                </button>
+            </div>
 
-                    <!-- Formularios de Registro -->
-                    <div class="row g-3 mb-3">
-                        <div class="col-12 col-md-6">
-                            <div class="card p-3">
-                                <h6 class="h6 text-success mb-2">
-                                    <i class="fas fa-utensils me-2"></i>Registrar Comida
-                                </h6>
-                                <form id="registroConsumoForm">
-                                    <div class="input-group">
-                                        <input type="text" id="descripcionConsumo" class="form-control" 
-                                               placeholder="Ej: Tostadas con palta" required minlength="3">
-                                        <button id="submitConsumoButton" class="btn btn-success" type="submit">
-                                            <i class="fas fa-plus"></i>
-                                        </button>
-                                    </div>
-                                    <div id="apiConsumoLoading" class="loading-message text-success mt-2" style="display:none;">
-                                        <div class="spinner-border spinner-border-sm" role="status"></div>
-                                        <span>Calculando calorías...</span>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
+            <div class="d-flex gap-2 overflow-auto mb-3 pb-2" style="scrollbar-width: none;">
+                <button class="btn btn-sm btn-outline-secondary btn-filtro-receta" data-filtro="todos">Todo</button>
+                <button class="btn btn-sm btn-outline-primary btn-filtro-receta" data-filtro="alta-proteina">💪 Proteico</button>
+                <button class="btn btn-sm btn-outline-info btn-filtro-receta" data-filtro="bebidas">🥤 Bebida</button>
+                <button class="btn btn-sm btn-outline-success btn-filtro-receta" data-filtro="bajo-grasa">🥑 - Grasa</button>
+            </div>
+
+            <div id="stagingContainer" class="d-none"></div>
+
+            <h6 class="h6 text-success mb-2 mt-2">
+                <i class="fas fa-check-circle me-2"></i>Agregar extra
+            </h6>
+            <form id="registroConsumoForm">
+                <textarea id="descripcionConsumo" class="form-control mb-2 shadow-sm" 
+                    placeholder="Opcional: agrega algo extra (ej. una manzana)" style="border-radius: 12px;"></textarea>
+                
+                <button type="submit" id="submitConsumoButton" class="btn btn-success w-100 shadow-sm py-2 fw-bold">
+                    <i class="fas fa-save me-2"></i>REGISTRAR TODO
+                </button>
+                
+                <div id="apiConsumoLoading" style="display: none;" class="text-center mt-2">
+                    <div class="spinner-border spinner-border-sm text-primary"></div> <small>Analizando nutrición...</small>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6">
+        <div class="card p-3 h-100">
+            <h6 class="h6 text-danger mb-3">
+                <i class="fas fa-running me-2"></i>Registrar Gasto (Actividad)
+            </h6>
+            <form id="registroGastoForm">
+                <div class="input-group shadow-sm">
+                    <input type="text" id="descripcionGasto" class="form-control" 
+                           placeholder="Ej: 30 min de correr" required minlength="3">
+                    <button id="submitGastoButton" class="btn btn-danger px-3" type="submit">
+                        <i class="fas fa-minus-circle"></i>
+                    </button>
+                </div>
+                <div id="apiGastoLoading" class="loading-message text-danger mt-2" style="display:none;">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                    <span>Calculando gasto...</span>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="recipeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-bold text-dark" id="modalRecipeTitle">Cantidad</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <div class="display-6 fw-bold text-primary mb-1">
+                    <input type="number" id="modalGramsInput" class="form-control form-control-lg text-center border-0 fw-bold" 
+                           style="font-size: 2rem;" value="100">
+                </div>
+                <p id="modalUnitLabel" class="text-muted text-uppercase small fw-bold">gramos</p>
+                <button type="button" class="btn btn-primary w-100 py-3 rounded-pill fw-bold" onclick="window.confirmRecipeAddition()">
+                    AGREGAR AL PLATO
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalRecetas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+            <div class="modal-header border-0">
+                <h6 class="modal-title fw-bold" id="tituloModalRecetas">Seleccionar Receta</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="row row-cols-2 g-2" id="recetasGrid"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalNuevaReceta" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+            <div class="modal-header bg-primary text-white border-0" style="border-radius: 20px 20px 0 0;">
+                <h6 class="modal-title fw-bold"><i class="fas fa-plus-circle me-2"></i>Guardar Nueva Receta</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formNuevaReceta">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Nombre de la receta</label>
+                        <input type="text" class="form-control" id="newRecNombre" placeholder="Ej: Mezcla Maestra" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Ingredientes (Descripción)</label>
+                        <textarea class="form-control mb-2" id="newRecIngredientes" rows="3" 
+                                placeholder="Ej: 100g harina, 30g whey protein Star Nutrition..."></textarea>
                         
-                        <div class="col-12 col-md-6">
-                            <div class="card p-3">
-                                <h6 class="h6 text-danger mb-2">
-                                    <i class="fas fa-running me-2"></i>Registrar Ejercicio
-                                </h6>
-                                <form id="registroGastoForm">
-                                    <div class="input-group">
-                                        <input type="text" id="descripcionGasto" class="form-control" 
-                                               placeholder="Ej: 30 min de correr" required minlength="3">
-                                        <button id="submitGastoButton" class="btn btn-danger" type="submit">
-                                            <i class="fas fa-minus"></i>
-                                        </button>
-                                    </div>
-                                    <div id="apiGastoLoading" class="loading-message text-danger mt-2" style="display:none;">
-                                        <div class="spinner-border spinner-border-sm" role="status"></div>
-                                        <span>Calculando gasto...</span>
-                                    </div>
-                                </form>
-                            </div>
+                        <button type="button" id="btnCalcularMacrosIA" class="btn btn-sm btn-outline-primary w-100 rounded-pill">
+                            <i class="fas fa-magic me-1"></i> Calcular Macros con IA
+                        </button>
+                        <div id="loadingIA" class="text-center mt-2 d-none">
+                            <div class="spinner-border spinner-border-sm text-primary"></div> <small>Analizando ingredientes...</small>
                         </div>
                     </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-secondary">Kcal (por 100g)</label>
+                            <input type="number" class="form-control" id="newRecKcal" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-secondary">Proteína (g)</label>
+                            <input type="number" class="form-control" id="newRecProt" required>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small fw-bold text-secondary">Carbs</label>
+                            <input type="number" class="form-control" id="newRecCarb" required>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small fw-bold text-secondary">Grasas</label>
+                            <input type="number" class="form-control" id="newRecGrasa" required>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small fw-bold text-secondary">Fibra</label>
+                            <input type="number" class="form-control" id="newRecFibra">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">Guardar Receta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
                     <!-- Log Detallado -->
                     <div class="card p-3">
@@ -546,15 +655,15 @@
                             <i class="fas fa-calendar-week me-2 text-primary"></i>Resumen Semanal
                         </h5>
                         <div class="d-flex flex-column gap-2">
-                            <div class="summary-box box-consumo">
+                            <div class="summary-box box-consumo" role="button">
                                 <h6>Total Consumido</h6>
                                 <p class="value-medium"><span id="totalConsumidoSemana">0</span> <span class="value-unit">Kcal</span></p>
                             </div>
-                            <div class="summary-box box-gasto">
+                            <div class="summary-box box-gasto" role="button">
                                 <h6>Total Gastado</h6>
                                 <p class="value-medium"><span id="totalGastadoSemana">0</span> <span class="value-unit">Kcal</span></p>
                             </div>
-                            <div id="balanceNetoSemanaBox" class="summary-box box-balance-semana">
+                            <div id="balanceNetoSemanaBox" class="summary-box box-balance-semana" role="button">
                                 <h6>Balance Neto</h6>
                                 <p class="value-large"><span id="netBalanceSemana">0</span> <span class="value-unit">Kcal</span></p>
                             </div>
@@ -605,16 +714,7 @@
            tarda un tick en cargar. */
         let _authTab = 'login';
 
-        function switchAuthTab(tab) {
-            _authTab = tab;
-            document.getElementById('tab-login').classList.toggle('active', tab === 'login');
-            document.getElementById('tab-register').classList.toggle('active', tab === 'register');
-            document.getElementById('register-extra').style.display = tab === 'register' ? 'block' : 'none';
-            document.getElementById('forgot-wrap').style.display    = tab === 'login'    ? 'block' : 'none';
-            document.getElementById('auth-submit-btn').textContent  = tab === 'login'    ? 'Ingresar' : 'Crear cuenta';
-            document.getElementById('auth-password').autocomplete   = tab === 'login'    ? 'current-password' : 'new-password';
-            clearAuthError();
-        }
+        
 
         function handleAuthSubmit() {
             const email    = document.getElementById('auth-email').value.trim();

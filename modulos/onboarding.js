@@ -874,7 +874,7 @@ function recolectarPasoActual() {
 
         if (campo.tipo === 'number') {
             const input = document.getElementById(`ob-input-${keyId}`);
-            const val   = parseFloat(input?.value);
+            const val   = parseFloat(input?.value.trim());
             if (!input || isNaN(val) || val < campo.min || val > campo.max) {
                 const errEl = document.getElementById(`ob-err-${keyId}`);
                 if (errEl) { errEl.textContent = `Ingresá un valor entre ${campo.min} y ${campo.max}`; errEl.classList.add('visible'); }
@@ -929,23 +929,143 @@ function handleBack() {
 // === PANTALLA RESUMEN DE MÉTRICAS ===
 // ==============================================================================
 
-async function mostrarResumen() {
-    // Calcular métricas
-    const metricas = calcularMetricasNutricionales(datosRecolectados);
+// async function mostrarResumen() {
+//     // Calcular métricas
+//     const metricas = calcularMetricasNutricionales(datosRecolectados);
 
-    // Progress al 100%
+//     // Progress al 100%
+//     document.getElementById('ob-progress-fill').style.width = '100%';
+//     document.getElementById('ob-step-label').textContent = '¡Listo!';
+
+//     // Calcular macros sugeridos
+//     const protGramos  = Math.round((datosRecolectados.peso_actual || 0) * 1.9);
+//     const grasGramos  = Math.round((metricas.calorias_objetivo * 0.25) / 9);
+//     const carbGramos  = Math.round((metricas.calorias_objetivo - protGramos*4 - grasGramos*9) / 4);
+//     const totalMacroKcal = protGramos*4 + grasGramos*9 + Math.max(0, carbGramos)*4;
+
+//     const protPct = Math.round(protGramos*4 / totalMacroKcal * 100);
+//     const grasPct = Math.round(grasGramos*9 / totalMacroKcal * 100);
+//     const carbPct = 100 - protPct - grasPct;
+
+//     const container = document.getElementById('ob-step-content');
+//     container.innerHTML = `
+//     <div class="ob-resumen">
+//         <div class="ob-resumen-header">
+//             <div class="ob-resumen-check">✓</div>
+//             <h2 class="ob-resumen-titulo">Tu plan está listo</h2>
+//             <p class="ob-resumen-sub">Basado en tus datos, estas son tus métricas personalizadas.</p>
+//         </div>
+
+//         <div class="ob-metricas-grid">
+//             <div class="ob-metrica-card">
+//                 <div class="ob-metrica-label">Metabolismo basal (TMB)</div>
+//                 <div class="ob-metrica-valor">${metricas.tmb}</div>
+//                 <div class="ob-metrica-unidad">kcal en reposo</div>
+//             </div>
+//             <div class="ob-metrica-card">
+//                 <div class="ob-metrica-label">Gasto total diario (TDEE)</div>
+//                 <div class="ob-metrica-valor">${metricas.tdee}</div>
+//                 <div class="ob-metrica-unidad">kcal con actividad</div>
+//             </div>
+//             <div class="ob-metrica-card full">
+//                 <div class="ob-metrica-label">🎯 Calorías objetivo diarias</div>
+//                 <div class="ob-metrica-valor" style="font-size:2.4rem">${metricas.calorias_objetivo}</div>
+//                 <div class="ob-metrica-unidad">
+//                     ${metricas.calorias_objetivo < metricas.tdee
+//                         ? `Déficit de ${metricas.tdee - metricas.calorias_objetivo} kcal → ${datosRecolectados.ritmo_semanal} kg/sem`
+//                         : `Superávit de ${metricas.calorias_objetivo - metricas.tdee} kcal`}
+//                 </div>
+//             </div>
+//         </div>
+
+//         <div class="ob-macros-wrap">
+//             <div class="ob-macros-titulo">Distribución de macros sugerida</div>
+//             <div class="ob-macro-row">
+//                 <span class="ob-macro-nombre">🥩 Proteína</span>
+//                 <div class="ob-macro-bar-wrap">
+//                     <div class="ob-macro-bar" style="width:0%; background:#c8f03e" data-pct="${protPct}"></div>
+//                 </div>
+//                 <span class="ob-macro-gramos">${protGramos}g</span>
+//             </div>
+//             <div class="ob-macro-row">
+//                 <span class="ob-macro-nombre">🍚 Carbos</span>
+//                 <div class="ob-macro-bar-wrap">
+//                     <div class="ob-macro-bar" style="width:0%; background:#7aef8a" data-pct="${carbPct}"></div>
+//                 </div>
+//                 <span class="ob-macro-gramos">${Math.max(0, carbGramos)}g</span>
+//             </div>
+//             <div class="ob-macro-row">
+//                 <span class="ob-macro-nombre">🥑 Grasas</span>
+//                 <div class="ob-macro-bar-wrap">
+//                     <div class="ob-macro-bar" style="width:0%; background:#f0c93e" data-pct="${grasPct}"></div>
+//                 </div>
+//                 <span class="ob-macro-gramos">${grasGramos}g</span>
+//             </div>
+//         </div>
+//     </div>
+//     `;
+
+//     // Animar barras de macros con delay
+//     setTimeout(() => {
+//         document.querySelectorAll('.ob-macro-bar').forEach(bar => {
+//             bar.style.width = `${bar.dataset.pct}%`;
+//         });
+//     }, 200);
+
+//     // Cambiar botón a "Empezar"
+//     const btnNext = document.getElementById('ob-btn-next');
+//     btnNext.textContent = '🚀 Empezar mi plan';
+//     btnNext.onclick = () => guardarYEntrar(metricas);
+
+//     // Ocultar botón atrás
+//     document.getElementById('ob-btn-back').style.display = 'none';
+// }
+
+async function mostrarResumen() {
+    const metricas = calcularMetricasNutricionales(datosRecolectados);
+    const peso = datosRecolectados.peso_actual || 0;
+    const objetivo = datosRecolectados.objetivo; // Asumiendo 'perder', 'mantener', 'ganar'
+
+    // 1. CÁLCULO DINÁMICO DE PROTEÍNA
+    // Ajustamos el factor según el objetivo para proteger músculo o optimizar síntesis
+    let factorProteina = 1.8; 
+    if (objetivo === 'perder') factorProteina = 2.2; // Mayor protección en déficit
+    if (objetivo === 'ganar') factorProteina = 1.7;  // El superávit ya ayuda, no hace falta tanta
+    
+    const protGramos = Math.round(peso * factorProteina);
+
+    // 2. CÁLCULO DE GRASAS CON MÍNIMO DE SEGURIDAD
+    // Usamos el 25% de las kcal, pero nunca menos de 0.7g por kilo de peso
+    const kcalGrasasSugeridas = metricas.calorias_objetivo * 0.25;
+    let grasGramos = Math.round(kcalGrasasSugeridas / 9);
+    const minGrasasSaludable = Math.round(peso * 0.7);
+
+    if (grasGramos < minGrasasSaludable) {
+        grasGramos = minGrasasSaludable;
+    }
+
+    // 3. CARBOHIDRATOS (RESTO DE CALORÍAS)
+    const kcalRestantes = metricas.calorias_objetivo - (protGramos * 4) - (grasGramos * 9);
+    const carbGramos = Math.round(Math.max(0, kcalRestantes) / 4);
+
+    // 4. CÁLCULO DE PORCENTAJES REALES PARA LA UI
+    const totalKcalFinal = (protGramos * 4) + (grasGramos * 9) + (carbGramos * 4);
+    const protPct = Math.round((protGramos * 4 / totalKcalFinal) * 100);
+    const grasPct = Math.round((grasGramos * 9 / totalKcalFinal) * 100);
+    const carbPct = 100 - protPct - grasPct;
+
+    // Lógica de advertencia
+    const ritmoSemanas = datosRecolectados.ritmo_semanal || 0;
+    const esAgresivo = ritmoSemanas > 1.0;
+    const advertenciaHtml = esAgresivo 
+    ? `<div class="ob-alert-warning" style="color: #ff9800; font-size: 0.85rem; margin-top: 8px; font-weight: 600;">
+        ⚠️ Ritmo agresivo: Priorizá la proteína para cuidar tu músculo.
+       </div>` 
+    : '';
+
+    // --- RENDERIZADO DE UI ---
     document.getElementById('ob-progress-fill').style.width = '100%';
     document.getElementById('ob-step-label').textContent = '¡Listo!';
-
-    // Calcular macros sugeridos
-    const protGramos  = Math.round((datosRecolectados.peso_actual || 0) * 1.9);
-    const grasGramos  = Math.round((metricas.calorias_objetivo * 0.25) / 9);
-    const carbGramos  = Math.round((metricas.calorias_objetivo - protGramos*4 - grasGramos*9) / 4);
-    const totalMacroKcal = protGramos*4 + grasGramos*9 + Math.max(0, carbGramos)*4;
-
-    const protPct = Math.round(protGramos*4 / totalMacroKcal * 100);
-    const grasPct = Math.round(grasGramos*9 / totalMacroKcal * 100);
-    const carbPct = 100 - protPct - grasPct;
 
     const container = document.getElementById('ob-step-content');
     container.innerHTML = `
@@ -953,7 +1073,7 @@ async function mostrarResumen() {
         <div class="ob-resumen-header">
             <div class="ob-resumen-check">✓</div>
             <h2 class="ob-resumen-titulo">Tu plan está listo</h2>
-            <p class="ob-resumen-sub">Basado en tus datos, estas son tus métricas personalizadas.</p>
+            <p class="ob-resumen-sub">Basado en tus datos de <b>${peso}kg</b> y objetivo de <b>${objetivo}</b>.</p>
         </div>
 
         <div class="ob-metricas-grid">
@@ -970,10 +1090,13 @@ async function mostrarResumen() {
             <div class="ob-metrica-card full">
                 <div class="ob-metrica-label">🎯 Calorías objetivo diarias</div>
                 <div class="ob-metrica-valor" style="font-size:2.4rem">${metricas.calorias_objetivo}</div>
-                <div class="ob-metrica-unidad">
-                    ${metricas.calorias_objetivo < metricas.tdee
-                        ? `Déficit de ${metricas.tdee - metricas.calorias_objetivo} kcal → ${datosRecolectados.ritmo_semanal} kg/sem`
-                        : `Superávit de ${metricas.calorias_objetivo - metricas.tdee} kcal`}
+                <div class="ob-metrica-unit-wrap">
+                    <div class="ob-metrica-unidad">
+                        ${metricas.calorias_objetivo < metricas.tdee
+                            ? `Déficit de ${metricas.tdee - metricas.calorias_objetivo} kcal → -${ritmoSemanas} kg/sem`
+                            : `Superávit de ${metricas.calorias_objetivo - metricas.tdee} kcal`}
+                    </div>
+                    ${advertenciaHtml}
                 </div>
             </div>
         </div>
@@ -981,7 +1104,7 @@ async function mostrarResumen() {
         <div class="ob-macros-wrap">
             <div class="ob-macros-titulo">Distribución de macros sugerida</div>
             <div class="ob-macro-row">
-                <span class="ob-macro-nombre">🥩 Proteína</span>
+                <span class="ob-macro-nombre">🥩 Proteína (${factorProteina}g/kg)</span>
                 <div class="ob-macro-bar-wrap">
                     <div class="ob-macro-bar" style="width:0%; background:#c8f03e" data-pct="${protPct}"></div>
                 </div>
@@ -992,32 +1115,28 @@ async function mostrarResumen() {
                 <div class="ob-macro-bar-wrap">
                     <div class="ob-macro-bar" style="width:0%; background:#7aef8a" data-pct="${carbPct}"></div>
                 </div>
-                <span class="ob-macro-gramos">${Math.max(0, carbGramos)}g</span>
+                <span class="ob-macro-gramos">${carbGramos}g</span>
             </div>
             <div class="ob-macro-row">
-                <span class="ob-macro-nombre">🥑 Grasas</span>
+                <span class="ob-macro-nombre">🥑 Grasas (Mín. salud)</span>
                 <div class="ob-macro-bar-wrap">
                     <div class="ob-macro-bar" style="width:0%; background:#f0c93e" data-pct="${grasPct}"></div>
                 </div>
                 <span class="ob-macro-gramos">${grasGramos}g</span>
             </div>
         </div>
-    </div>
-    `;
+    </div>`;
 
-    // Animar barras de macros con delay
+    // Animación y setup de botones igual que antes...
     setTimeout(() => {
         document.querySelectorAll('.ob-macro-bar').forEach(bar => {
             bar.style.width = `${bar.dataset.pct}%`;
         });
     }, 200);
 
-    // Cambiar botón a "Empezar"
     const btnNext = document.getElementById('ob-btn-next');
     btnNext.textContent = '🚀 Empezar mi plan';
-    btnNext.onclick = () => guardarYEntrar(metricas);
-
-    // Ocultar botón atrás
+    btnNext.onclick = () => guardarYEntrar({...metricas, macros: {protGramos, grasGramos, carbGramos}});
     document.getElementById('ob-btn-back').style.display = 'none';
 }
 

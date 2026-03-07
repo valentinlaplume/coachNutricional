@@ -74,6 +74,7 @@ import {
     updateWeekUI, changeWeek 
 } from './modulos/state.js';
 
+import { getStagingComidas, clearStaging } from "./modulos/ui_recetas.js";
 
 // ==============================================================================
 // ║  BLOQUE 5 — DOM ELEMENTS                                                    ║
@@ -86,9 +87,6 @@ elements.loadingIndicator.style.display = 'fixed';
 elements.summaryContent.style.display = 'none';
 
 
-
-
-
 // ==============================================================================
 // ╔══════════════════════════════════════════════════════════════════════════════╗
 // ║  BLOQUE 16 — FORMULARIOS DE REGISTRO                                        ║
@@ -96,44 +94,105 @@ elements.summaryContent.style.display = 'none';
 // ╚══════════════════════════════════════════════════════════════════════════════╝
 // ==============================================================================
 
+// elements.registroConsumoForm.addEventListener('submit', async (e) => {
+//     e.preventDefault();
+//     if (new Date(selectedDay + 'T00:00:00') > new Date(todayISO + 'T00:00:00')) return;
+
+//     const descripcion = elements.descripcionConsumo.value.trim();
+//     if (descripcion.length < 3 || !currentUser) return;
+
+//     elements.submitConsumoButton.disabled = true;
+//     elements.apiConsumoLoading.style.display = 'flex';
+
+//     try {
+//         const datos = await fetchGeminiFoodData(descripcion);
+//         if (!datos) { elements.coachMessage.textContent = "❌ No se pudo interpretar la respuesta nutricional."; return; }
+
+//         const docRef    = getDailyDocRef(selectedDay);
+//         const current   = weekData[selectedDay];
+//         const nuevoItem = {
+//             id: crypto.randomUUID(),
+//             hora: new Date().toISOString(),
+//             descripcion,
+//             kcal:          datos.kcal,
+//             proteinas:     datos.proteinas,
+//             carbohidratos: datos.carbohidratos,
+//             grasas:        datos.grasas,
+//             fibra:         datos.fibra,
+//             procesado:     datos.procesado,
+//         };
+//         await setDoc(docRef, {
+//             consumido:    (current.consumido || 0) + datos.kcal,
+//             log_consumido: (current.log_consumido || []).concat([nuevoItem])
+//         }, { merge: true });
+
+//         e.target.reset();
+//         elements.coachMessage.textContent = `✅ Consumo registrado: +${datos.kcal} Kcal`;
+
+//     } catch (error) {
+//         console.error("Error al obtener datos nutricionales:", error);
+//         elements.coachMessage.textContent = `⚠️ Error al obtener datos nutricionales`;
+//     } finally {
+//         elements.apiConsumoLoading.style.display = 'none';
+//         elements.submitConsumoButton.disabled = false;
+//     }
+// });
+
 elements.registroConsumoForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (new Date(selectedDay + 'T00:00:00') > new Date(todayISO + 'T00:00:00')) return;
+    if (!currentUser) return;
 
-    const descripcion = elements.descripcionConsumo.value.trim();
-    if (descripcion.length < 3 || !currentUser) return;
+    const staging = getStagingComidas(); // [{id, nombre, cantidad, unidad, ...}]
+    const inputManual = elements.descripcionConsumo.value.trim();
+
+    if (staging.length === 0 && inputManual.length < 3) return;
+
+    // Prompt para Gemini (igual que antes)
+    let promptFinal = staging.length > 0 
+        ? `DB: ${staging.map(i => `${i.nombre} ${i.cantidad}${i.unidad}`).join(", ")}. Manual: ${inputManual}` 
+        : inputManual;
 
     elements.submitConsumoButton.disabled = true;
     elements.apiConsumoLoading.style.display = 'flex';
 
     try {
-        const datos = await fetchGeminiFoodData(descripcion);
-        if (!datos) { elements.coachMessage.textContent = "❌ No se pudo interpretar la respuesta nutricional."; return; }
+        const datos = await fetchGeminiFoodData(promptFinal);
+        if (!datos) return;
 
-        const docRef    = getDailyDocRef(selectedDay);
-        const current   = weekData[selectedDay];
+        const docRef = getDailyDocRef(selectedDay);
+        const current = weekData[selectedDay] || { consumido: 0, log_consumido: [] };
+
         const nuevoItem = {
             id: crypto.randomUUID(),
             hora: new Date().toISOString(),
-            descripcion,
-            kcal:          datos.kcal,
-            proteinas:     datos.proteinas,
+            // --- DATOS PUROS ---
+            recetasUsadas: staging.map(s => ({ 
+                nombre: s.nombre, 
+                cantidad: s.cantidad, 
+                unidad: s.unidad || 'g' 
+            })),
+            descripcionManual: inputManual,
+            // -------------------
+            kcal: datos.kcal,
+            proteinas: datos.proteinas,
             carbohidratos: datos.carbohidratos,
-            grasas:        datos.grasas,
-            fibra:         datos.fibra,
-            procesado:     datos.procesado,
+            grasas: datos.grasas,
+            fibra: datos.fibra || 0
         };
+        
         await setDoc(docRef, {
-            consumido:    (current.consumido || 0) + datos.kcal,
+            consumido: (current.consumido || 0) + datos.kcal,
             log_consumido: (current.log_consumido || []).concat([nuevoItem])
         }, { merge: true });
 
+
+        // 4. Limpieza de UI
         e.target.reset();
-        elements.coachMessage.textContent = `✅ Consumo registrado: +${datos.kcal} Kcal`;
+        clearStaging();
+        elements.coachMessage.textContent = `✅ +${datos.kcal} Kcal`;
 
     } catch (error) {
-        console.error("Error al obtener datos nutricionales:", error);
-        elements.coachMessage.textContent = `⚠️ Error al obtener datos nutricionales`;
+        console.error("Error:", error);
     } finally {
         elements.apiConsumoLoading.style.display = 'none';
         elements.submitConsumoButton.disabled = false;
@@ -247,6 +306,8 @@ async function initializeFirebase() {
         showToast(`Error de conexión: ${error.message}`, "error");
     }
 }
+
+
 
 // 🚀 Arrancar la app
 initializeFirebase();

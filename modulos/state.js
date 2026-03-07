@@ -4,7 +4,8 @@
 import { getElements } from './elements.js';
 import { calcularMacrosDia, calcularMetasDiarias   } from './nutrition.js';
 import { renderMacronutrients , renderTargetProgress, renderCombinedLog   } from './ui.js';
-import { setupRealtimeListener    } from './firestore.js';
+import { setupRealtimeListener, obtenerUltimoAnalisis, guardarAnalisisCoach    } from './firestore.js';
+import { generateCoachAnalysis,   } from './coach.js';
 let elements = getElements();
 
 export let db = null;
@@ -13,7 +14,22 @@ export let currentUser = null;
 export let currentPerfil = null;
 export let activePersonId = null;
 export let activePersonName = null;
- 
+export let misRecetas = [];
+
+export function setMisRecetas(recetas) {
+    // Si vienen recetas de Firestore (array con longitud), úsalas. 
+    // Si no, usa las de prueba (opcional, para desarrollo).
+    if (recetas && recetas.length > 0) {
+        misRecetas = recetas;
+    } else {
+        misRecetas = [
+            { id: '1', nombre: 'Mezcla Maestra Proteica', ingredientes: '100g harina garbanzo, 30g cacao amargo, 100g scoop proteina Star Nutrition, 30g polvo para hornear',  kcal: 350, proteinas: 50, carbohidratos: 100, grasas: 5, fibra: 8, unidad: 'g' },
+            { id: '2', nombre: 'Hamburguesa de Lentejas', kcal: 220, proteinas: 12, grasas: 2, fibra: 10, unidad: 'g' },
+            { id: '3', nombre: 'Fideos Proteicos Matarazzo', kcal: 340, proteinas: 20, grasas: 1.5, fibra: 4, unidad: 'g' },
+            { id: '4', nombre: 'Coca Cola Zero', kcal: 0, proteinas: 0, grasas: 0, fibra: 0, unidad: 'ml' }
+        ];
+    }
+}
 export function setActivePersonId(param) { activePersonId = param; }
 export function setActivePersonName(param) { activePersonName = param; }
 
@@ -69,9 +85,7 @@ export function setWeekDataForDay(dateISO, data)     { weekData[dateISO] = data;
 export function setCurrentLogData(data)              { currentLogData = data; }
 export function setUnsubscribeFromLog(fns)           { unsubscribeFromLog = fns; }
 
-
 export function addUnsubscribeFromLog(fns)           { unsubscribeFromLog.push(fns); }
-
 
 // ==============================================================================
 // === USUARIO Y PERFIL (Firebase Auth + Firestore) ===
@@ -224,7 +238,7 @@ export async function renderSelectedDay() {
     [elements.registroConsumoForm, elements.registroGastoForm].forEach(f => f.style.opacity = locked ? '0.5' : '1');
     [elements.descripcionConsumo, elements.descripcionGasto].forEach(inp => {
         inp.disabled = locked;
-        inp.placeholder = locked ? "No se puede registrar en días futuros" : inp.id.includes('Consumo') ? "Ej: 1 huevo hervido" : "Ej: 30 min de correr";
+        inp.placeholder = locked ? "No se puede registrar en días futuros" : inp.id.includes('Consumo') ? "Opcional: agrega algo extra (ej. una manzana)" : "Ej: 30 min de correr";
     });
     [elements.submitConsumoButton, elements.submitGastoButton].forEach(btn => btn.disabled = locked);
 

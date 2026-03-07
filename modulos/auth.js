@@ -37,7 +37,7 @@ import { setupRealtimeListener }                  from './firestore.js';
 import { getElements }                            from './elements.js';
 import { setupWeekNavigation }                    from '../script_dev.js';
 import { deleteLogItem }                          from '../script_dev.js';
-
+import { inicializarUIComidas } from "./ui_recetas.js";
 const elements = getElements();
 
 export function switchAuthTab(tab) {
@@ -152,6 +152,7 @@ export function onLoginSuccess() {
     setupRealtimeListener();
     updateActiveUserUI();
 
+    inicializarUIComidas();
     window.deleteLogItem = deleteLogItem;
 }
 

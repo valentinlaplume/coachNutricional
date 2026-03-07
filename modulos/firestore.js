@@ -12,8 +12,10 @@ import { getFirestore,
     Timestamp, 
     updateDoc,
     serverTimestamp ,  
+    increment,
     limit // Añadimos limit para la optimización
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
 
 import {
     db,
@@ -33,6 +35,9 @@ import {
 import{
     updateWeekSummaryUI
 } from './ui.js'
+import { checkFeatureAccess  } from "./plans.js";
+import { setMisRecetas } from "./state.js";
+import { renderRecetasGrid , setupFiltrosUI} from "./ui_recetas.js";
 
 import { getElements } from './elements.js';
 let elements = getElements();
@@ -181,7 +186,7 @@ export async function savePerfil(updates) {
     setCurrentPerfil({ ...currentPerfil, ...updates });
 }
 
-async function incrementarConsultaCoach() {
+export async function incrementarConsultaCoach() {
     const acceso = checkFeatureAccess(currentPerfil, "coach_consultas_mes");
     if (!acceso.permitido) { showUpgradeModal(acceso.razon); return false; }
     const perfilRef = doc(db, `users/${currentUser.uid}/perfil`, "datos");
@@ -199,7 +204,7 @@ export function getDailyDocRef(dateISO = selectedDay) {
     return doc(db, `users/${currentUser.uid}/datos_caloricos/${dateISO}`);
 }
 
-async function guardarAnalisisCoach(dayISO, momentOfDay, message) {
+export async function guardarAnalisisCoach(dayISO, momentOfDay, message) {
     if (!currentUser) return;
     const analisisRef = doc(db, `users/${currentUser.uid}/coach_analysis/${dayISO}-${momentOfDay}`);
     await setDoc(analisisRef, {
@@ -209,8 +214,7 @@ async function guardarAnalisisCoach(dayISO, momentOfDay, message) {
     });
     console.log(`Análisis del coach para ${dayISO} (${momentOfDay}) guardado.`);
 }
-
-async function obtenerUltimoAnalisis(dayISO) {
+export async function obtenerUltimoAnalisis(dayISO) {
     if (!currentUser) return "";
     const dayStart = new Date(dayISO + "T00:00:00");
     const dayEnd   = new Date(dayISO + "T23:59:59");
@@ -229,8 +233,58 @@ async function obtenerUltimoAnalisis(dayISO) {
         console.error("Error obteniendo análisis:", error);
     }
     return "";
+    
 }
 
+/**
+ * Guarda o actualiza datos en cualquier colección/documento de Firestore.
+ * @param {object} data - Objeto con los datos a guardar.
+ * @param {boolean} merge - Si debe combinar con datos existentes (por defecto true).
+ */
+export async function saveInFirestore(path, data, merge = true) {
+    try {
+        const docRef = doc(db, path);
+        await setDoc(docRef, data, { merge });
+        console.log(`✅ Datos guardados en: ${path}`);
+        return true;
+    } catch (error) {
+        console.error(`❌ Error guardando en ${path}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Obtiene todos los documentos de una colección de un usuario.
+ * Útil para cargar la lista de 'misRecetas' al iniciar la app.
+ */
+export async function getCollection(coleccion) {
+    try {
+        const colRef = collection(db, `users/${currentUser.uid}/${coleccion}`);
+        const snapshot = await getDocs(colRef);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+        console.error(`❌ Error obteniendo ${coleccion}:`, error);
+        return [];
+    }
+}
+
+export async function saveReceta(nuevaReceta) {
+    // Validación mínima: nombre y kcal son obligatorios
+    if (!nuevaReceta.nombre || nuevaReceta.kcal === undefined) {
+        console.error("❌ La receta está incompleta");
+        return;
+    }
+
+    const path = `users/${currentUser.uid}/recetas/${nuevaReceta.id}`;
+    
+    // Mostramos un feedback visual rápido si tienes algún spinner o mensaje
+    try {
+        await saveInFirestore(path, nuevaReceta);
+        // Aquí podrías disparar una notificación tipo Toast o Haptic Feedback
+    } catch (e) {
+        console.error("Error al salvar receta:", e);
+    }
+};
 
 // ==============================================================================
 // ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -262,5 +316,20 @@ export function setupRealtimeListener() {
             if (dateISO === selectedDay) renderSelectedDay();
         }, (error) => console.error(`Error en listener para ${dateISO}:`, error));
         addUnsubscribeFromLog(unsub);
+    });
+
+    // NUEVO: Listener para tus recetas personales
+    const recetasRef = collection(db, `users/${currentUser.uid}/recetas`);
+    const q = query(recetasRef, orderBy("nombre", "asc")); // Orden alfábetico
+    onSnapshot(q, (snapshot) => 
+    {
+        const recetasActualizadas = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+    }));
+
+        setMisRecetas(recetasActualizadas);
+        setupFiltrosUI(); 
+        renderRecetasGrid(recetasActualizadas);
     });
 }

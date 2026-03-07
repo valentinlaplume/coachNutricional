@@ -5,19 +5,26 @@
 // ║  → Mover a coach.js                                                         ║
 // ╚══════════════════════════════════════════════════════════════════════════════╝
 // ==============================================================================
+import { setupRealtimeListener, obtenerUltimoAnalisis, guardarAnalisisCoach,
+    incrementarConsultaCoach 
+    } from './firestore.js';
 
-// ====================
-// Incorporar en coach.js — MEAL_TIMES, getMealCategory,
-// generarMensajeCoach, generarMensajeFallback,
-// generateCoachAnalysis, checkAnalysisToday, showAnalysisConfirmationDialog, showBasicAnalysis
-// ====================
-import {
-    selectedDay,
-    currentLogData,
-    weekData,
-    todayISO,
-    getActivePersonName,
-} from './state.js';
+    
+    // ====================
+    // Incorporar en coach.js — MEAL_TIMES, getMealCategory,
+    // generarMensajeCoach, generarMensajeFallback,
+    // generateCoachAnalysis, checkAnalysisToday, showAnalysisConfirmationDialog, showBasicAnalysis
+    // ====================
+    import {
+        selectedDay,
+        currentLogData,
+        weekData,
+        todayISO,
+        getActivePersonName,
+    } from './state.js';
+
+import { getElements } from './elements.js';
+let elements = getElements();
 
 const MEAL_TIMES = {
     DESAYUNO: { start: 6,     end: 12    },
@@ -155,7 +162,7 @@ function showAnalysisConfirmationDialog(type, consumed, expended) {
     });
 }
 
-async function generateCoachAnalysis(dayISO, consumed, expended, perfil, isToday) {
+export async function generateCoachAnalysis(dayISO, consumed, expended, perfil, isToday) {
     if (isToday) {
         const hasAnalysis = await checkAnalysisToday(dayISO);
         const confirmed = await showAnalysisConfirmationDialog(hasAnalysis ? "existing" : "new", consumed, expended);
@@ -176,7 +183,9 @@ async function generateCoachAnalysis(dayISO, consumed, expended, perfil, isToday
     const mensajeAnterior = isToday ? await obtenerUltimoAnalisis(dayISO) : "";
 
     try {
+        console.log(consumed, expended, perfil, currentMoment, mensajeAnterior)
         const message = await generarMensajeCoach(consumed, expended, perfil, currentMoment, mensajeAnterior);
+        console.log(message)
         elements.coachMessage.innerHTML = sanitizeHTML(message);
 
         if (isToday) {

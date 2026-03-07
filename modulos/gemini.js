@@ -219,3 +219,5 @@ async function fetchGeminiCoachMessage(systemPrompt, userQuery) {
     }
     return "📊 Sigue registrando tus comidas para recibir retroalimentación personalizada.";
 }
+
+
